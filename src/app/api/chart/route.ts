@@ -51,7 +51,7 @@ export async function GET(req: Request) {
     }
 
     // Obtener ventas del período actual y anterior
-    const [salesCurrent, salesPrevious]: [Sale[], Sale[]] = await Promise.all([
+    const [salesCurrent, salesPrevious]: [any[], any[]] = await Promise.all([
       SaleProduct.find({ createdAt: { $gte: startDate, $lte: now } }),
       SaleProduct.find({ createdAt: { $gte: previousStartDate, $lte: previousEndDate } }),
     ]);

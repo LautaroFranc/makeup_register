@@ -34,7 +34,7 @@ export default function Home() {
   const { data: purchaseDate, fetchData: fetchPurchase } =
     useFetch<Purchase[]>();
   const { data: dataChart, fetchData: fetchChart } = useFetch<ChartOptions[]>();
-  const { data: saleSummary, fetchData: fetchSaleSummary } = useFetch<ChartOptions[]>();
+  const { data: saleSummary, fetchData: fetchSaleSummary } = useFetch<any>();
 
   useEffect(() => {
     fetchPurchase(`http://localhost:3000/api/purchase`);

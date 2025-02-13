@@ -55,7 +55,7 @@ export async function GET() {
 
       for (const sale of sales) {
         const product = allProducts.find(
-          (p) => p._id.toString() === sale.idProduct.toString()
+          (p:any) => p._id.toString() === sale.idProduct.toString()
         );
         if (product) {
           const revenue = Number(sale.sellPrice) * sale.stock;
@@ -107,7 +107,7 @@ export async function GET() {
 
     for (const sale of soldProducts) {
       const product = allProducts.find(
-        (p) => p._id.toString() === sale.idProduct.toString()
+        (p:any) => p._id.toString() === sale.idProduct.toString()
       );
       if (product) {
         if (!productSalesMap.has(sale.idProduct.toString())) {
