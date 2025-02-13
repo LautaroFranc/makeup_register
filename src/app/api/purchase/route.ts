@@ -1,15 +1,7 @@
-import { NextApiRequest, NextApiResponse } from "next";
 import { NextResponse } from "next/server";
-import mongoose from "mongoose";
 import SaleProduct from "@/models/SaleProduct";
-import Product from "@/models/Product"; // Asegúrate de tener este modelo
+import Product from "@/models/Product";
 
-type SaleResponse = {
-  idProduct: string;
-  image: string;
-  totalPrice: number;
-  totalStockSold: number;
-}[];
 
 export async function GET() {
   try {
@@ -33,7 +25,7 @@ export async function GET() {
 
     // Mapear los datos de las ventas con la imagen del producto
     const result = await Promise.all(
-      sales.map(async (sale) => {
+      sales.map(async (sale:any) => {
         const product = await Product.findOne({ _id: sale.idProduct });
         return {
           idProduct: sale.idProduct,
