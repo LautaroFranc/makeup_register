@@ -37,9 +37,9 @@ export default function Home() {
   const { data: saleSummary, fetchData: fetchSaleSummary } = useFetch<any>();
 
   useEffect(() => {
-    fetchPurchase(`http://localhost:3000/api/purchase`);
-    fetchChart(`http://localhost:3000/api/chart?filter=3months`);
-    fetchSaleSummary(`http://localhost:3000/api/saleProduct/summary`);
+    fetchPurchase(`https://makeup-register.vercel.app/api/purchase`);
+    fetchChart(`https://makeup-register.vercel.app/api/chart?filter=3months`);
+    fetchSaleSummary(`https://makeup-register.vercel.app/api/saleProduct/summary`);
   }, []);
   useEffect(() => {
     if (purchaseDate?.length) {
@@ -52,7 +52,7 @@ export default function Home() {
     }
   }, [dataChart]);
   const handleTimeRange = (date: string) => {
-    fetchChart(`http://localhost:3000/api/chart?filter=${date}`);
+    fetchChart(`https://makeup-register.vercel.app/api/chart?filter=${date}`);
     setChart([]);
   };
   return (

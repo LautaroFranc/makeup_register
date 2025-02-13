@@ -89,7 +89,7 @@ const ProductForm = () => {
     if (image) {
       formData.append("image", image);
     }
-    fetchData("http://localhost:3000/api/products", {
+    fetchData("https://makeup-register.vercel.app/api/products", {
       method: "POST",
       body: formData,
     });

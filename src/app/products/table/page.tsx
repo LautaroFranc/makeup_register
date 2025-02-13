@@ -66,8 +66,8 @@ export default function ProductDashboard() {
   );
   // Fetch initial data
   useEffect(() => {
-    fetchProducts(`http://localhost:3000/api/products?category=${category}`);
-    fetchSales(`http://localhost:3000/api/saleProduct?category=${category}`);
+    fetchProducts(`https://makeup-register.vercel.app/api/products?category=${category}`);
+    fetchSales(`https://makeup-register.vercel.app/api/saleProduct?category=${category}`);
   }, [fetchProducts, fetchSales, category]);
 
   // Update products list and handle sales updates
@@ -112,7 +112,7 @@ export default function ProductDashboard() {
       );
 
       const updatedData = { [field]: field === "name" ? value : Number(value) };
-      fetchProducts(`http://localhost:3000/api/products?id=${id}`, {
+      fetchProducts(`https://makeup-register.vercel.app/api/products?id=${id}`, {
         method: "PUT",
         body: JSON.stringify(updatedData),
       });
@@ -124,7 +124,7 @@ export default function ProductDashboard() {
 
   const handleDelete = useCallback(
     (id: string) => {
-      fetchProducts(`http://localhost:3000/api/products?id=${id}`, {
+      fetchProducts(`https://makeup-register.vercel.app/api/products?id=${id}`, {
         method: "DELETE",
       });
       setProducts((prevProducts) =>
@@ -151,7 +151,7 @@ export default function ProductDashboard() {
       category: product.category,
     };
 
-    createSale("http://localhost:3000/api/saleProduct", {
+    createSale("https://makeup-register.vercel.app/api/saleProduct", {
       method: "POST",
       body: JSON.stringify(saleData),
     });
