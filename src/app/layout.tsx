@@ -5,9 +5,10 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/toaster";
 import { SessionProvider } from "next-auth/react";
-import { usePathname, useSearchParams } from "next/navigation";
-
+import { usePathname } from "next/navigation";
 import "./globals.css";
+import { useEffect } from "react";
+import { useRouter } from 'next/navigation';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,8 +25,17 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const pathname = usePathname(); // Obtiene la ruta actual (sin dominio)
-  console.log(pathname);
+  const pathname = usePathname(); 
+  const router = useRouter();
+
+ useEffect(() =>{
+  if(![pathname].includes("/login") ){
+    const token = localStorage.getItem("token");
+    if(!token){
+      router.push('/login');
+    }
+  }
+ },[pathname])
   return (
     <SessionProvider>
       <html lang="en">

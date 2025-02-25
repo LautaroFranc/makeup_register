@@ -23,10 +23,7 @@ export default function Register() {
     const data = await res.json();
 
     if (res.ok) {
-      alert(data.message);
       router.push('/');
-    } else {
-      alert(data.message);
     }
   };
 

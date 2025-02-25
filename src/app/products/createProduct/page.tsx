@@ -38,8 +38,6 @@ const ProductForm = () => {
   };
   // Actualiza el precio de venta y recalcula el margen automáticamente
   const handleSalePriceChange = (newSalePrice: number) => {
-    console.log(newSalePrice);
-
     setSalePrice(newSalePrice);
     const newMargin = ((newSalePrice - price) / price) * 100;
     setMargin(Number(newMargin.toFixed(2)));
