@@ -7,7 +7,7 @@ import { authMiddleware } from "../middleware";
 // Conectar a la base de datos antes de manejar cualquier solicitud
 connectDB();
 
-export async function generateUniqueProductCode(prefix = "P") {
+async function generateUniqueProductCode(prefix = "P") {
   const lastProduct = await Product.findOne().sort({ createdAt: -1 });
   const lastCode = lastProduct?.code || `${prefix}99`;
   const lastNumber = parseInt(lastCode.replace(prefix, "")) || 99;
