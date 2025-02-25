@@ -7,15 +7,13 @@ import SaleModal from "@/components/SaleModal";
 import { useFetch } from "@/hooks/useFetch";
 import { formatToARS } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { useSearchParams } from "next/navigation";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+// import {
+//   Select,
+//   SelectContent,
+//   SelectItem,
+//   SelectTrigger,
+//   SelectValue,
+// } from "@/components/ui/select";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -27,6 +25,7 @@ interface Product {
   sellPrice: number;
   stock: number;
   category: string;
+  code: string;
 }
 
 interface SaleProduct {
@@ -41,7 +40,6 @@ export default function ProductDashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [totalSales, setTotalSales] = useState<number>(0);
-  const [category, setCategory] = useState<string>("makeup");
   const [editingCell, setEditingCell] = useState<{
     _id: string;
     field: string;
@@ -66,9 +64,19 @@ export default function ProductDashboard() {
   );
   // Fetch initial data
   useEffect(() => {
-    fetchProducts(`https://makeup-register.vercel.app/api/products?category=${category}`);
-    fetchSales(`https://makeup-register.vercel.app/api/saleProduct?category=${category}`);
-  }, [fetchProducts, fetchSales, category]);
+    const token = localStorage.getItem("token");
+
+    fetchProducts(`/api/products`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    fetchSales(`/api/saleProduct`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }, [fetchProducts, fetchSales]);
 
   // Update products list and handle sales updates
   useEffect(() => {
@@ -112,9 +120,14 @@ export default function ProductDashboard() {
       );
 
       const updatedData = { [field]: field === "name" ? value : Number(value) };
-      fetchProducts(`https://makeup-register.vercel.app/api/products?id=${id}`, {
+      const token = localStorage.getItem("token");
+
+      fetchProducts(`/api/products?id=${id}`, {
         method: "PUT",
         body: JSON.stringify(updatedData),
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       setEditingCell({ _id: "", field: "" });
@@ -124,8 +137,12 @@ export default function ProductDashboard() {
 
   const handleDelete = useCallback(
     (id: string) => {
-      fetchProducts(`https://makeup-register.vercel.app/api/products?id=${id}`, {
+      const token = localStorage.getItem("token");
+      fetchProducts(`/api/products?id=${id}`, {
         method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
       setProducts((prevProducts) =>
         prevProducts.filter((product) => product._id !== id)
@@ -148,18 +165,21 @@ export default function ProductDashboard() {
       idProduct: product._id,
       sellPrice: product.sellPrice,
       stock: sale.quantity,
-      category: product.category,
     };
+    const token = localStorage.getItem("token");
 
-    createSale("https://makeup-register.vercel.app/api/saleProduct", {
+    createSale("/api/saleProduct", {
       method: "POST",
       body: JSON.stringify(saleData),
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
   };
 
-  const handleSelectCategory = (categoryId: string) => {
-    setCategory(categoryId);
-  };
+  // const handleSelectCategory = (categoryId: string) => {
+  //   setCategory(categoryId);
+  // };
 
   const totals = products.reduce(
     (acc, product) => {
@@ -218,7 +238,7 @@ export default function ProductDashboard() {
 
       <div>
         <div className="flex justify-between">
-          <Card className="mb-4 w-72">
+          {/* <Card className="mb-4 w-72">
             <Select value={category} onValueChange={handleSelectCategory}>
               <SelectTrigger id="category">
                 <SelectValue placeholder="Seleccionar categoría" />
@@ -228,7 +248,7 @@ export default function ProductDashboard() {
                 <SelectItem value="jewel">Joya</SelectItem>
               </SelectContent>
             </Select>
-          </Card>
+          </Card> */}
           <Card className="relative mb-4">
             <span className="absolute inset-y-0 left-3 flex items-center text-gray-500">
               <Search className="h-5 w-5" />
@@ -253,7 +273,6 @@ export default function ProductDashboard() {
           handleOpenSaleModal={handleOpenSaleModal}
         />
       </div>
-
       <SaleModal
         onClose={() => setSelectedProduct(null)}
         onConfirm={handleConfirmSale}

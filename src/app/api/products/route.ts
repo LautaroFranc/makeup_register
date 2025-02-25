@@ -1,24 +1,29 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import Product from "@/models/Product"; // Asegúrate de que esta ruta sea correcta
 import connectDB from "@/config/db"; // Ruta de conexión a la base de datos
 import cloudinary from "@/config/cloudinary";
+import { authMiddleware } from "../middleware";
 
 // Conectar a la base de datos antes de manejar cualquier solicitud
 connectDB();
 
-// Manejar solicitud GET (Listar productos)
-export async function GET(request: Request) {
+export async function generateUniqueProductCode(prefix = "P") {
+  const lastProduct = await Product.findOne().sort({ createdAt: -1 });
+  const lastCode = lastProduct?.code || `${prefix}99`;
+  const lastNumber = parseInt(lastCode.replace(prefix, "")) || 99;
+  return `${prefix}${lastNumber + 1}`;
+}
+
+// 📌 Obtener productos (filtrados por usuario)
+export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const category = searchParams.get("category");
+    const authCheck = await authMiddleware(req);
+    if (authCheck.status !== 200) return authCheck; // Verifica autenticación
+
+    const userId = (await authCheck.json()).user._id; // Extraer ID del usuario autenticado
 
     let products;
-
-    if (category) {
-      products = await Product.find({ category });
-    } else {
-      products = await Product.find();
-    }
+    products = await Product.find({ user: userId });
 
     return NextResponse.json(products);
   } catch (error: any) {
@@ -29,21 +34,22 @@ export async function GET(request: Request) {
   }
 }
 
-// Manejar solicitud POST (Crear un nuevo producto)
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    const authCheck = await authMiddleware(req);
+    if (authCheck.status !== 200) return authCheck;
+    const userId = (await authCheck.json()).user._id; // Extraer usuario autenticado
     const formData = await req.formData();
     const productData: any = {};
+
     formData.forEach((value, key) => {
       productData[key] = value;
     });
 
-    // Verificar si existe un archivo de imagen
     const imageFile = formData.get("image") as Blob | null;
     let uploadedImage: any = null;
 
     if (imageFile) {
-      // Limitar el tamaño del archivo
       if (imageFile.size > 5 * 1024 * 1024) {
         return NextResponse.json(
           { success: false, error: "Image size exceeds 5 MB" },
@@ -52,25 +58,19 @@ export async function POST(req: Request) {
       }
 
       const buffer = Buffer.from(await imageFile.arrayBuffer());
-      if (buffer.length === 0) {
-        return NextResponse.json(
-          { success: false, error: "File buffer is empty" },
-          { status: 400 }
-        );
-      }
-
       uploadedImage = await cloudinary.uploader.upload(
         `data:${imageFile.type};base64,${buffer.toString("base64")}`,
-        {
-          folder: "products",
-          resource_type: "auto",
-        }
+        { folder: "products", resource_type: "auto" }
       );
     }
+
+    const newProductCode = await generateUniqueProductCode();
 
     const newProduct = await Product.create({
       ...productData,
       image: uploadedImage?.secure_url || null,
+      code: newProductCode,
+      user: userId,
     });
 
     return NextResponse.json(
@@ -78,7 +78,6 @@ export async function POST(req: Request) {
       { status: 201 }
     );
   } catch (error: any) {
-    console.error(error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -86,12 +85,16 @@ export async function POST(req: Request) {
   }
 }
 
-// Manejar solicitud DELETE (Eliminar un producto por ID)
-export async function DELETE(req: Request) {
+export async function DELETE(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const authCheck = await authMiddleware(req);
+    if (authCheck.status !== 200) return authCheck;
 
+    const userId = (await authCheck.json()).user._id;
+    console.log(userId);
+    const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
+
     if (!id) {
       return NextResponse.json(
         { success: false, error: "ID is required" },
@@ -99,10 +102,14 @@ export async function DELETE(req: Request) {
       );
     }
 
-    const deletedProduct = await Product.findByIdAndDelete(id);
+    const deletedProduct = await Product.findOneAndDelete({
+      _id: id,
+      user: userId,
+    });
+
     if (!deletedProduct) {
       return NextResponse.json(
-        { success: false, error: "Product not found" },
+        { success: false, error: "Product not found or unauthorized" },
         { status: 404 }
       );
     }
@@ -116,11 +123,15 @@ export async function DELETE(req: Request) {
   }
 }
 
-// Manejar solicitud PUT (Actualizar un producto por ID)
-export async function PUT(req: Request) {
+export async function PUT(req: NextRequest) {
   try {
+    const authCheck = await authMiddleware(req);
+    if (authCheck.status !== 200) return authCheck;
+
+    const userId = (await authCheck.json()).user._id;
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
+
     if (!id) {
       return NextResponse.json(
         { success: false, error: "ID is required" },
@@ -129,12 +140,15 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const updatedProduct = await Product.findByIdAndUpdate(id, body, {
-      new: true,
-    });
+    const updatedProduct = await Product.findOneAndUpdate(
+      { _id: id, user: userId },
+      body,
+      { new: true }
+    );
+
     if (!updatedProduct) {
       return NextResponse.json(
-        { success: false, error: "Product not found" },
+        { success: false, error: "Product not found or unauthorized" },
         { status: 404 }
       );
     }

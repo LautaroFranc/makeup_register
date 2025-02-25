@@ -50,7 +50,7 @@ const ProductForm = () => {
       setImage(e.target.files[0]);
     }
   };
- 
+
   useEffect(() => {
     if (data) {
       toast({
@@ -84,14 +84,18 @@ const ProductForm = () => {
     formData.append("buyPrice", price + "");
     formData.append("margin", margin + "");
     formData.append("sellPrice", salePrice + "");
-    formData.append("category", category);
     formData.append("stock", stock + "");
     if (image) {
       formData.append("image", image);
     }
-    fetchData("https://makeup-register.vercel.app/api/products", {
+    const token = localStorage.getItem("token");
+
+    fetchData("/api/products", {
       method: "POST",
       body: formData,
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
   };
 
@@ -174,7 +178,7 @@ const ProductForm = () => {
           />
         </div>
         {/* Categoría */}
-        <div>
+        {/* <div>
           <Label htmlFor="category">Categoría</Label>
           <Select
             value={category}
@@ -188,7 +192,7 @@ const ProductForm = () => {
               <SelectItem value="jewel">Joya</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </div> */}
 
         {/* Subir Imagen */}
         <div>
@@ -207,7 +211,7 @@ const ProductForm = () => {
         </div>
 
         {/* Botón */}
-        <Button type="submit" disabled={loading} className="w-full" >
+        <Button type="submit" disabled={loading} className="w-full">
           {loading ? "Cargando..." : "Crear Producto"}
         </Button>
       </form>

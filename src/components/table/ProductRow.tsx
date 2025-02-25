@@ -12,6 +12,7 @@ interface Product {
   buyPrice: number;
   sellPrice: number;
   stock: number;
+  code: string;
 }
 
 interface EditingCell {
@@ -48,6 +49,9 @@ const ProductRow: React.FC<ProductRowProps> = ({
           height={70}
           className="rounded-md"
         />
+      </TableCell>
+      <TableCell>
+        <span className="text-blue-600">{product.code}</span>
       </TableCell>
       <EditableCell
         value={product.name}

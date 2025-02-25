@@ -1,14 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import SaleProduct from "@/models/SaleProduct";
 import Product from "@/models/Product";
+import { authMiddleware } from "../middleware";
 
-
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const today = new Date();
-    // Buscar ventas dentro del mes en curso
+    const authCheck = await authMiddleware(req);
+    if (authCheck.status !== 200) return authCheck; // Verifica autenticación
+
+    const userId = (await authCheck.json()).user._id; // Extraer ID del usuario autenticado
     const sales = await SaleProduct.find({
       createdAt: {
         $gte: firstDayOfMonth,
@@ -25,8 +28,11 @@ export async function GET() {
 
     // Mapear los datos de las ventas con la imagen del producto
     const result = await Promise.all(
-      sales.map(async (sale:any) => {
-        const product = await Product.findOne({ _id: sale.idProduct });
+      sales.map(async (sale: any) => {
+        const product = await Product.findOne({
+          _id: sale.idProduct,
+          user: userId,
+        });
         return {
           idProduct: sale.idProduct,
           image: product?.image || "/placeholder.jpg",

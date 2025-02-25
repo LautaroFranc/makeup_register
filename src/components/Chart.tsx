@@ -43,11 +43,11 @@ export function Chart({
   handleTimeRange: (date: string) => void;
 }) {
   const [timeRange, setTimeRange] = useState("3months");
-
   const handleSelectDay = (value: string) => {
     setTimeRange(value);
     handleTimeRange(value);
   };
+  console.log(chartData)
   return (
     <Card>
       <CardHeader>
@@ -87,28 +87,28 @@ export function Chart({
           >
             <CartesianGrid horizontal={false} />
             <YAxis
-              dataKey="product"
+              dataKey="name"
               type="category"
               tickLine={false}
               tickMargin={10}
               axisLine={false}
               hide
             />
-            <XAxis dataKey="totalSales" type="number" hide />
+            <XAxis dataKey="totalPriceCurrent"  type="number" hide />
             <ChartTooltip
-              cursor={false}
+              cursor={true}
               content={<ChartTooltipContent indicator="line" />}
             />
-            <Bar dataKey="totalSales" fill="var(--color-desktop)" radius={4}>
+            <Bar dataKey="totalPriceCurrent" fill="var(--color-desktop)" radius={4}>
               <LabelList
-                dataKey="product"
+                dataKey="name"
                 position="insideLeft"
                 offset={8}
                 className="fill-[--color-label]"
                 fontSize={12}
               />
               <LabelList
-                dataKey="totalSales"
+                dataKey="totalPriceCurrent"
                 position="right"
                 offset={8}
                 className="fill-foreground"
@@ -118,19 +118,6 @@ export function Chart({
           </BarChart>
         </ChartContainer>
       </CardContent>
-      <CardFooter>
-        <div className="flex w-full items-start gap-2 text-sm">
-          <div className="grid gap-2">
-            <div className="flex items-center gap-2 font-medium leading-none">
-              Tendencia al alza del 5,2% este mes{" "}
-              <TrendingUp className="h-4 w-4" />
-            </div>
-            <div className="flex items-center gap-2 leading-none text-muted-foreground">
-              Mostrando el total de visitantes para el rango seleccionado
-            </div>
-          </div>
-        </div>
-      </CardFooter>
     </Card>
   );
 }

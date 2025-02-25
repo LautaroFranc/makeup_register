@@ -18,6 +18,7 @@ interface Product {
   buyPrice: number;
   sellPrice: number;
   stock: number;
+  code: string;
 }
 
 interface EditingCell {
@@ -46,7 +47,6 @@ const ProductTable: React.FC<ProductTableProps> = ({
   handleOpenSaleModal,
   loading,
 }) => {
- 
   return (
     <div>
       <Card>
@@ -54,6 +54,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
           <TableHeader>
             <TableRow>
               <TableHead></TableHead>
+              <TableHead>Codigo</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Precio de compra</TableHead>
               <TableHead>Precio de venta</TableHead>

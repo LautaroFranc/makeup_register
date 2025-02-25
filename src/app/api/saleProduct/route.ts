@@ -7,14 +7,11 @@ connectDB();
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const category = searchParams.get("category");
 
     let saleProduct: any = [];
 
-    if (category) {
-      saleProduct = await SaleProduct.find({ category });
-    }
+      saleProduct = await SaleProduct.find();
+    
 
     return NextResponse.json(saleProduct);
   } catch (error: any) {

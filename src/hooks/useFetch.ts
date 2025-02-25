@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 
 interface FetchOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE";
@@ -12,6 +12,10 @@ interface FetchResult<T> {
   loading: boolean;
   fetchData: (url: string, options?: FetchOptions) => Promise<void>;
 }
+const baseUrl =
+  process.env.NODE_ENV === "production"
+    ? process.env.URL_PROD
+    : "http://localhost:3000/";
 
 export function useFetch<T = unknown>(): FetchResult<T> {
   const [data, setData] = useState<T | null>(null);
@@ -24,7 +28,7 @@ export function useFetch<T = unknown>(): FetchResult<T> {
       setError(null);
 
       try {
-        const response = await fetch(url, options);
+        const response = await fetch(baseUrl + url, options);
 
         if (!response.ok) {
           const errorText = await response.text();
