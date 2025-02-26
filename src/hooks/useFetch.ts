@@ -29,7 +29,7 @@ export function useFetch<T = unknown>(): FetchResult<T> {
 
       try {
         const response = await fetch(baseUrl + url, options);
-
+console.log(url,baseUrl)
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(errorText || "Error en la petición");
