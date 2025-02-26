@@ -16,7 +16,7 @@ interface FetchResult<T> {
 
 const baseUrl =
   process.env.NODE_ENV === "production"
-    ? process.env.URL_PROD
+    ? process.env.URL_PROD || "https://makeup-register.vercel.app"
     : "http://localhost:3000/";
 
 export function useFetch<T = unknown>(): FetchResult<T> {
