@@ -1,9 +1,10 @@
 import { useState, useCallback } from "react";
+import axios, { AxiosRequestConfig } from "axios";
 
 interface FetchOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE";
-  headers?: HeadersInit;
-  body?: BodyInit | null;
+  headers?: Record<string, string>;
+  body?: any;
 }
 
 interface FetchResult<T> {
@@ -12,9 +13,10 @@ interface FetchResult<T> {
   loading: boolean;
   fetchData: (url: string, options?: FetchOptions) => Promise<void>;
 }
+
 const baseUrl =
   process.env.NODE_ENV === "production"
-    ? process.env.URL_PROD || "https://makeup-register.vercel.app"
+    ? process.env.URL_PROD
     : "http://localhost:3000/";
 
 export function useFetch<T = unknown>(): FetchResult<T> {
@@ -28,17 +30,21 @@ export function useFetch<T = unknown>(): FetchResult<T> {
       setError(null);
 
       try {
-        const response = await fetch(baseUrl + url, options);
-console.log(url,baseUrl)
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || "Error en la petición");
-        }
+        const axiosConfig: AxiosRequestConfig = {
+          url: baseUrl + url,
+          method: options.method || "GET",
+          headers: {
+            ...options.headers,
+          },
+          data: options.body ? JSON.stringify(options.body) : undefined,
+        };
 
-        const jsonData: T = await response.json();
-        setData(jsonData);
+        const response = await axios(axiosConfig);
+        setData(response.data);
       } catch (err: any) {
-        setError(err.message || "Error desconocido");
+        setError(
+          err.response?.data?.error || err.message || "Error desconocido"
+        );
       } finally {
         setLoading(false);
       }
