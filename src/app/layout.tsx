@@ -4,7 +4,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/toaster";
-import { SessionProvider } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import "./globals.css";
 import { useEffect } from "react";
@@ -37,7 +36,6 @@ export default function RootLayout({
   }
  },[pathname])
   return (
-    <SessionProvider>
       <html lang="en">
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-100`}
@@ -53,6 +51,5 @@ export default function RootLayout({
           </SidebarProvider>
         </body>
       </html>
-    </SessionProvider>
   );
 }
