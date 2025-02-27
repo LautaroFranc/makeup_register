@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import Product from "@/models/Product";
 import SaleProduct from "@/models/SaleProduct";
+import { authMiddleware } from "../../middleware";
 
 interface SaleStats {
   totalStockSold: number;
@@ -23,7 +24,7 @@ interface TrendResponse {
   }[];
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const now = new Date();
     const firstDayCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -32,9 +33,12 @@ export async function GET() {
       now.getMonth() - 1,
       1
     );
+    const authCheck = await authMiddleware(req);
+    if (authCheck.status !== 200) return authCheck; // Verifica autenticación
 
+    const userId = (await authCheck.json()).user._id; // Extraer ID del usuario autenticado
     // Obtener total de stock actual
-    const allProducts = await Product.find();
+    const allProducts = await Product.find({ user: userId });
     const totalStock = allProducts.reduce(
       (acc, product) => acc + product.stock,
       0
@@ -55,7 +59,7 @@ export async function GET() {
 
       for (const sale of sales) {
         const product = allProducts.find(
-          (p:any) => p._id.toString() === sale.idProduct.toString()
+          (p: any) => p._id.toString() === sale.idProduct.toString()
         );
         if (product) {
           const revenue = Number(sale.sellPrice) * sale.stock;
@@ -107,7 +111,7 @@ export async function GET() {
 
     for (const sale of soldProducts) {
       const product = allProducts.find(
-        (p:any) => p._id.toString() === sale.idProduct.toString()
+        (p: any) => p._id.toString() === sale.idProduct.toString()
       );
       if (product) {
         if (!productSalesMap.has(sale.idProduct.toString())) {
