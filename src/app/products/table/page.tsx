@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ProductTable from "@/components/table/Table";
 import SaleModal from "@/components/SaleModal";
 import { useFetch } from "@/hooks/useFetch";
-import { formatToARS } from "@/lib/utils";
+import { formatToARS, tokenDecode } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 // import {
 //   Select,
@@ -58,19 +58,22 @@ export default function ProductDashboard() {
     useFetch<SaleProduct>();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState<string>("");
-
   const filteredProducts = products.filter((product) =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
   // Fetch initial data
   useEffect(() => {
     const token = localStorage.getItem("token");
+    const userToken = tokenDecode();
 
-    fetchProducts(`/api/products`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    if (userToken) {
+      fetchProducts(`/api/products?slug=${userToken?.slug || ""}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    }
+
     fetchSales(`/api/saleProduct`, {
       headers: {
         Authorization: `Bearer ${token}`,

@@ -1,10 +1,11 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import slugify from "slugify";
 
 export interface IUsers extends Document {
   name: string;
   password: string;
   email: string;
-  role: string;
+  slug: string; // 👈 Agregamos el slug
 }
 
 const UsersSchema: Schema<IUsers> = new Schema(
@@ -21,13 +22,21 @@ const UsersSchema: Schema<IUsers> = new Schema(
       type: String,
       required: true,
     },
-    role: {
+    slug: {
       type: String,
-      required: true,
+      unique: true,
     },
   },
   { timestamps: true }
 );
+
+// 🛠 Generar slug antes de guardar
+UsersSchema.pre<IUsers>("save", function (next) {
+  if (!this.slug) {
+    this.slug = slugify(this.name, { lower: true, strict: true });
+  }
+  next();
+});
 
 const Users: Model<IUsers> =
   mongoose.models.Users || mongoose.model<IUsers>("Users", UsersSchema);

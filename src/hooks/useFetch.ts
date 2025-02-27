@@ -17,7 +17,7 @@ interface FetchResult<T> {
 const baseUrl =
   process.env.NODE_ENV === "production"
     ? process.env.URL_PROD || "https://makeup-register.vercel.app"
-    : "http://localhost:3000/";
+    : "http://localhost:3001/";
 
 export function useFetch<T = unknown>(): FetchResult<T> {
   const [data, setData] = useState<T | null>(null);
@@ -32,11 +32,14 @@ export function useFetch<T = unknown>(): FetchResult<T> {
       try {
         const axiosConfig: AxiosRequestConfig = {
           url: baseUrl + url,
-          method: options.method || "GET",
+          method: options?.method || "GET",
           headers: {
-            ...options.headers,
+            ...(options?.headers || {}),
           },
-          data: options.body ? JSON.stringify(options.body) : undefined,
+          data:
+            options?.body instanceof FormData
+              ? options.body
+              : JSON.stringify(options?.body),
         };
 
         const response = await axios(axiosConfig);

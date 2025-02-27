@@ -3,6 +3,7 @@ import Product from "@/models/Product"; // Asegúrate de que esta ruta sea corre
 import connectDB from "@/config/db"; // Ruta de conexión a la base de datos
 import cloudinary from "@/config/cloudinary";
 import { authMiddleware } from "../middleware";
+import Users from "@/models/Users";
 
 // Conectar a la base de datos antes de manejar cualquier solicitud
 connectDB();
@@ -14,16 +15,28 @@ async function generateUniqueProductCode(prefix = "P") {
   return `${prefix}${lastNumber + 1}`;
 }
 
-// 📌 Obtener productos (filtrados por usuario)
 export async function GET(req: NextRequest) {
   try {
-    const authCheck = await authMiddleware(req);
-    if (authCheck.status !== 200) return authCheck; // Verifica autenticación
+    const { searchParams } = new URL(req.url);
+    const slug = searchParams.get("slug");
 
-    const userId = (await authCheck.json()).user._id; // Extraer ID del usuario autenticado
+    if (!slug) {
+      return NextResponse.json(
+        { success: false, error: "Slug requerido" },
+        { status: 400 }
+      );
+    }
 
-    let products;
-    products = await Product.find({ user: userId });
+    const user = await Users.findOne({ slug });
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    const products = await Product.find({ user: user._id });
 
     return NextResponse.json(products);
   } catch (error: any) {

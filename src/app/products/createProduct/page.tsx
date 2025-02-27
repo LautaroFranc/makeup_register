@@ -87,7 +87,7 @@ const ProductForm = () => {
       formData.append("image", image);
     }
     const token = localStorage.getItem("token");
-
+console.log(name)
     fetchData("/api/products", {
       method: "POST",
       body: formData,
