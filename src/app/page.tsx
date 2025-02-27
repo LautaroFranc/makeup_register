@@ -113,10 +113,15 @@ export default function Home() {
       </div>
       <Card className="md:col-span-1 m-4">
         <div className="flex items-center">
-          <span className="flex m-4 font-semibold">Historial</span>
+          <span className="flex m-4 font-semibold">Historial de ventas</span>
           <History className="text-center" />
         </div>
         <PurchaseTable purchases={purchase} />
+        {!purchase.length && !loading ? (
+          <span className="mt-4 text-center text-gray-500">
+            sin ventas registradas
+          </span>
+        ) : null}
         {loading ? (
           <div role="status" className="flex justify-center m-36">
             <svg
