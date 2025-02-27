@@ -9,6 +9,7 @@ export interface IProduct extends Document {
   stock: number;
   code: string;
   user: string;
+  category: string;
 }
 
 const ProductSchema: Schema<IProduct> = new Schema(
@@ -37,6 +38,10 @@ const ProductSchema: Schema<IProduct> = new Schema(
     },
     stock: {
       type: Number,
+      required: true,
+    },
+    category: {
+      type: String,
       required: true,
     },
     user: {

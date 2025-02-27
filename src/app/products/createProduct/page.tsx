@@ -83,11 +83,11 @@ const ProductForm = () => {
     formData.append("margin", margin + "");
     formData.append("sellPrice", salePrice + "");
     formData.append("stock", stock + "");
+    formData.append("category", category + "");
     if (image) {
       formData.append("image", image);
     }
     const token = localStorage.getItem("token");
-console.log(name)
     fetchData("/api/products", {
       method: "POST",
       body: formData,
@@ -176,21 +176,17 @@ console.log(name)
           />
         </div>
         {/* Categoría */}
-        {/* <div>
+        <div>
           <Label htmlFor="category">Categoría</Label>
-          <Select
+          <Input
+            id="category"
+            type="text"
             value={category}
-            onValueChange={(value) => setCategory(value)}
-          >
-            <SelectTrigger id="category">
-              <SelectValue placeholder="Seleccionar categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="makeup">Maquillaje</SelectItem>
-              <SelectItem value="jewel">Joya</SelectItem>
-            </SelectContent>
-          </Select>
-        </div> */}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="categoría"
+            required
+          />
+        </div>
 
         {/* Subir Imagen */}
         <div>
