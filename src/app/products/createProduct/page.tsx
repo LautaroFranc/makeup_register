@@ -24,7 +24,7 @@ const ProductForm = () => {
   const [margin, setMargin] = useState(0); // Margen (%)
   const [salePrice, setSalePrice] = useState(0); // Precio de venta
   const [stock, setStock] = useState(0);
-  const [category, setCategory] = useState("makeup");
+  const [category, setCategory] = useState("");
   const [image, setImage] = useState<File | null>(null);
   const { toast } = useToast();
   const { data, error, loading, fetchData } = useFetch<Product[]>();
