@@ -54,8 +54,11 @@ export default function ProductDashboard() {
     loading,
   } = useFetch<Product[]>();
   const { data: salesData, fetchData: fetchSales } = useFetch<SaleProduct[]>();
-  const { data: saleUpdateData, fetchData: createSale } =
-    useFetch<SaleProduct>();
+  const {
+    data: saleUpdateData,
+    fetchData: createSale,
+    loading: loadingSale,
+  } = useFetch<SaleProduct>();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState<string>("");
   const filteredProducts = products.filter((product) =>
@@ -241,17 +244,6 @@ export default function ProductDashboard() {
 
       <div>
         <div className="flex justify-between">
-          {/* <Card className="mb-4 w-72">
-            <Select value={category} onValueChange={handleSelectCategory}>
-              <SelectTrigger id="category">
-                <SelectValue placeholder="Seleccionar categoría" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="makeup">Maquillaje</SelectItem>
-                <SelectItem value="jewel">Joya</SelectItem>
-              </SelectContent>
-            </Select>
-          </Card> */}
           <Card className="relative mb-4">
             <span className="absolute inset-y-0 left-3 flex items-center text-gray-500">
               <Search className="h-5 w-5" />
@@ -280,6 +272,7 @@ export default function ProductDashboard() {
         onClose={() => setSelectedProduct(null)}
         onConfirm={handleConfirmSale}
         product={selectedProduct}
+        loading={loadingSale}
       />
     </div>
   );

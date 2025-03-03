@@ -11,18 +11,21 @@ interface Product {
   sellPrice: number;
   stock: number;
 }
+
 interface SaleModalProps {
   product: Product | null;
   onClose: () => void;
   onConfirm: (saleData: { productId: string; quantity: number }) => void;
+  loading: boolean;
 }
 
 const SaleModal: React.FC<SaleModalProps> = ({
   product,
   onClose,
   onConfirm,
+  loading,
 }) => {
-  const [quantity, setQuantity] = useState<number>(1);
+  const [quantity, setQuantity] = useState<number>(0);
   const [total, setTotal] = useState<number>(product?.sellPrice || 0);
 
   const handleQuantityChange = (value: string) => {
@@ -31,7 +34,7 @@ const SaleModal: React.FC<SaleModalProps> = ({
     setTotal((product?.sellPrice || 0) * qty);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (quantity > 0 && quantity <= (product?.stock || 0)) {
       onConfirm({ productId: product!._id, quantity });
     } else {
@@ -51,7 +54,7 @@ const SaleModal: React.FC<SaleModalProps> = ({
           value={quantity}
           onChange={(e) => handleQuantityChange(e.target.value)}
           min="1"
-          max={product?.stock || 1}
+          max={product?.stock}
           placeholder="Cantidad"
           className="mt-2"
         />
@@ -59,8 +62,10 @@ const SaleModal: React.FC<SaleModalProps> = ({
         <p className="mt-4">Total: ${total}</p>
 
         <div className="flex justify-end mt-6 space-x-4">
-          <Button onClick={handleConfirm}>Confirmar Venta</Button>
-          <Button variant="secondary" onClick={onClose}>
+          <Button onClick={handleConfirm} disabled={loading}>
+            {loading ? "Procesando..." : "Confirmar Venta"}
+          </Button>
+          <Button variant="secondary" onClick={onClose} disabled={loading}>
             Cancelar
           </Button>
         </div>

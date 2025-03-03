@@ -72,6 +72,7 @@ export default function Home() {
       setChart(data || []);
     }
   }, [dataChart]);
+
   const handleTimeRange = (date: string) => {
     const token = localStorage.getItem("token");
     fetchChart(`/api/chart?filter=${date}`, {
@@ -81,13 +82,14 @@ export default function Home() {
     });
     setChart([]);
   };
+
   return (
     <div className="grid gap-1 md:grid-cols-2 m-4">
       <div className="grid gap-3 md:grid-cols-3 m-4">
         {[
           {
             title: "Total Stock",
-            value: saleSummary?.totalStock,
+            value: saleSummary?.totalStock || 0,
             color: "black",
             type: "text",
           },
@@ -118,9 +120,11 @@ export default function Home() {
         </div>
         <PurchaseTable purchases={purchase} />
         {!purchase.length && !loading ? (
-          <span className="mt-4 text-center text-gray-500">
-            sin ventas registradas
-          </span>
+          <div className="flex justify-center text-center text-gray-500">
+            <span className="mt-4 text-center text-gray-500">
+              sin ventas registradas
+            </span>
+          </div>
         ) : null}
         {loading ? (
           <div role="status" className="flex justify-center m-36">

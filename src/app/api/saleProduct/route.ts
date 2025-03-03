@@ -26,8 +26,8 @@ export async function GET(request: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-
-    const { idProduct, stock, ...rest } = body;
+   
+    const { idProduct, stock, ...rest } =  JSON.parse(body);
 
     // Verificar si el producto existe
     const product = await Product.findById(idProduct);
@@ -38,7 +38,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verificar si hay suficiente stock disponible
     if (product.stock < stock) {
       return NextResponse.json(
         {
@@ -49,8 +48,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Restar el stock del producto
     product.stock -= stock;
+
     await product.save();
 
     // Crear el registro de la venta

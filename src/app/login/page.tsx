@@ -6,10 +6,12 @@ import { useRouter } from 'next/navigation';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
 
     const res = await fetch('/api/auth/login', {
       method: 'POST',
@@ -20,6 +22,7 @@ export default function Login() {
     });
 
     const data = await res.json();
+    setLoading(false);
 
     if (res.ok) {
       localStorage.setItem('token', data.token);
@@ -67,8 +70,9 @@ export default function Login() {
           <button
             type="submit"
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-300"
+            disabled={loading}
           >
-            Iniciar Sesión
+            {loading ? 'Cargando...' : 'Iniciar Sesión'}
           </button>
         </form>
       </div>
