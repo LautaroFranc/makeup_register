@@ -152,11 +152,16 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    let body = await req.json();
+
+    if (typeof body === "string") {
+      body = JSON.parse(body);
+    }
+    
     const updatedProduct = await Product.findOneAndUpdate(
       { _id: id, user: userId },
-      body,
-      { new: true }
+      { $set: body },
+      { new: true, runValidators: true }
     );
 
     if (!updatedProduct) {
