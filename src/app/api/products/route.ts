@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const products = await Product.find({ user: user._id });
+    const products = await Product.find({ user: user._id }).sort({ createdAt: -1 });
 
     return NextResponse.json(products);
   } catch (error: any) {
