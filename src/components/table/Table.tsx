@@ -19,6 +19,7 @@ interface Product {
   sellPrice: number;
   stock: number;
   code: string;
+  category: string;
 }
 
 interface EditingCell {
@@ -56,6 +57,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
               <TableHead></TableHead>
               <TableHead>Codigo</TableHead>
               <TableHead>Nombre</TableHead>
+              <TableHead>Categoria</TableHead>
               <TableHead>Precio de compra</TableHead>
               <TableHead>Precio de venta</TableHead>
               <TableHead>Margen</TableHead>
@@ -79,7 +81,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
             ))}
           </TableBody>
         </Table>
-        {loading ? (
+        {loading && !products.length? (
           <div role="status" className="flex justify-center m-36">
             <svg
               aria-hidden="true"

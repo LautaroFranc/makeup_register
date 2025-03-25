@@ -13,6 +13,7 @@ interface Product {
   sellPrice: number;
   stock: number;
   code: string;
+  category: string;
 }
 
 interface EditingCell {
@@ -61,6 +62,16 @@ const ProductRow: React.FC<ProductRowProps> = ({
         onEdit={(value: any) => handleEdit(product._id, "name", value)}
         onStartEditing={() =>
           setEditingCell({ _id: product._id, field: "name" })
+        }
+      />
+      <EditableCell
+        value={product.category}
+        isEditing={
+          editingCell._id === product._id && editingCell.field === "category"
+        }
+        onEdit={(value: any) => handleEdit(product._id, "category", value)}
+        onStartEditing={() =>
+          setEditingCell({ _id: product._id, field: "category" })
         }
       />
       <EditableCell

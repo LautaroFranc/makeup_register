@@ -120,12 +120,19 @@ export default function ProductDashboard() {
       setProducts((prevProducts) =>
         prevProducts.map((product) =>
           product._id === id
-            ? { ...product, [field]: field === "name" ? value : Number(value) }
+            ? {
+                ...product,
+                [field]: ["name", "category"].includes(field)
+                  ? value
+                  : Number(value),
+              }
             : product
         )
       );
 
-      const updatedData = { [field]: field === "name" ? value : Number(value) };
+      const updatedData = {
+        [field]: ["name", "category"].includes(field) ? value : Number(value),
+      };
       const token = localStorage.getItem("token");
 
       fetchProducts(`/api/products?id=${id}`, {
