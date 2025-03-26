@@ -29,7 +29,10 @@ export async function authMiddleware(req: NextRequest) {
       );
     }
     // Agregar el usuario a la solicitud y continuar con la ejecución
-    return NextResponse.json({user:{_id:user._id}}, { status: 200 });
+    return NextResponse.json(
+      { user: { _id: user._id, slug: user.slug } },
+      { status: 200 }
+    );
   } catch (error) {
     console.log(error);
     return NextResponse.json({ error: "Token inválido" }, { status: 401 });

@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { useFetch } from "@/hooks/useFetch";
 import { Product } from "@/interface/product";
+import { CategorySelector } from "@/components/CategorySelect";
 
 const ProductForm = () => {
   const [name, setName] = useState("");
@@ -53,7 +54,7 @@ const ProductForm = () => {
       setPrice(0);
       setMargin(0);
       setSalePrice(0);
-      setCategory("makeup");
+      setCategory("");
       setImage(null);
       setStock(0);
     }
@@ -171,14 +172,7 @@ const ProductForm = () => {
         {/* Categoría */}
         <div>
           <Label htmlFor="category">Categoría</Label>
-          <Input
-            id="category"
-            type="text"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="categoría"
-            required
-          />
+          <CategorySelector value={category} onChange={setCategory} />
         </div>
 
         {/* Subir Imagen */}
