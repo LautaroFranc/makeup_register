@@ -135,7 +135,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({
         printWindow.document.write(`
           <html>
             <head>
-              <title>Código de Barras - ${product.name}</title>
+              <title>Código de Barras - ${currentProduct.name}</title>
               <style>
                 body { 
                   font-family: Arial, sans-serif; 

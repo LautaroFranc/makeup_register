@@ -32,6 +32,8 @@ interface Product {
   stock: number;
   category: string;
   code: string;
+  barcode: string;
+  user: string;
 }
 
 interface SaleProduct {
@@ -40,6 +42,18 @@ interface SaleProduct {
   sellPrice: number;
   stock: number;
   category: string;
+}
+
+interface ProductsResponse {
+  products: Product[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalProducts: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+    limit: number;
+  };
 }
 
 export default function ProductDashboard() {
@@ -87,9 +101,17 @@ export default function ProductDashboard() {
 
   // Update products list and handle sales updates
   useEffect(() => {
-    if (productsData?.products) {
-      setProducts(productsData.products);
-      setPagination(productsData.pagination);
+    if (productsData) {
+      // Si productsData es un array (respuesta antigua), usar directamente
+      if (Array.isArray(productsData)) {
+        setProducts(productsData);
+      }
+      // Si productsData tiene estructura { products, pagination } (respuesta nueva)
+      else if ("products" in productsData && "pagination" in productsData) {
+        const response = productsData as ProductsResponse;
+        setProducts(response.products);
+        setPagination(response.pagination);
+      }
     }
 
     if (saleUpdateData) {

@@ -25,7 +25,9 @@ interface Product {
   sellPrice: string;
   stock: number;
   code: string;
+  barcode: string;
   category: string;
+  user: string;
 }
 
 interface EditingCell {
