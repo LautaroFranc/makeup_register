@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
 
     const userId = (await authCheck.json()).user._id; // Extraer ID del usuario autenticado
     const sales = await SaleProduct.find({
+      user: userId,
       createdAt: {
         $gte: firstDayOfMonth,
         $lte: today,

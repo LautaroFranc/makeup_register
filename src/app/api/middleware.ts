@@ -3,7 +3,9 @@ import jwt from "jsonwebtoken";
 import Users from "@/models/Users";
 
 interface DecodedToken {
-  id: string;
+  userId: string;
+  email: string;
+  slug: string;
 }
 
 export async function authMiddleware(req: NextRequest) {
@@ -20,7 +22,7 @@ export async function authMiddleware(req: NextRequest) {
       token,
       process.env.JWT_SECRET || ""
     ) as DecodedToken;
-    const user = await Users.findById(decoded.id).select("-password");
+    const user = await Users.findById(decoded.userId).select("-password");
 
     if (!user) {
       return NextResponse.json(

@@ -1,6 +1,8 @@
-import { TableRow, TableCell } from "@/components/ui/table";
+import React, { useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Trash2, BadgeDollarSign, Eye, Edit, Barcode } from "lucide-react";
 import { formatToARS } from "@/lib/utils";
 import { ImageModal } from "@/components/ImageModal";
@@ -8,12 +10,12 @@ import { AttributesModal } from "@/components/AttributesModal";
 import { ProductEditModal } from "@/components/ProductEditModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { BarcodeModal } from "@/components/BarcodeModal";
-import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Product {
   _id: string;
   name: string;
+  description?: string;
   image?: string;
   images?: string[];
   attributes?: {
@@ -24,14 +26,12 @@ interface Product {
   stock: number;
   code: string;
   category: string;
+  user?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-interface EditingCell {
-  _id: string;
-  field: string;
-}
-
-interface ProductRowProps {
+interface ProductCardProps {
   product: Product;
   handleDelete: (_id: string) => void;
   handleOpenSaleModal: (product: string) => void;
@@ -40,7 +40,7 @@ interface ProductRowProps {
   onRefresh?: () => void;
 }
 
-const ProductRow: React.FC<ProductRowProps> = ({
+const ProductCard: React.FC<ProductCardProps> = ({
   product,
   handleDelete,
   calculateMargin,
@@ -59,7 +59,7 @@ const ProductRow: React.FC<ProductRowProps> = ({
   const { toast } = useToast();
 
   // Inicializar imágenes locales cuando cambie el producto
-  useEffect(() => {
+  React.useEffect(() => {
     const images = [];
     if (product.image) {
       images.push(product.image);
@@ -167,78 +167,77 @@ const ProductRow: React.FC<ProductRowProps> = ({
       setIsDeleting(false);
     }
   };
+
   return (
-    <TableRow>
-      <TableCell>
-        <div className="flex items-center gap-2">
-          {/* Imagen principal */}
-          {product.image && (
-            <Image
-              src={product.image}
-              alt={product.name}
-              width={35}
-              height={35}
-              className="rounded-md object-cover cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => setIsImageModalOpen(true)}
-            />
-          )}
-          {/* Imágenes adicionales */}
-          {product.images && product.images.length > 0 && (
-            <div className="flex gap-1">
-              {product.images.slice(0, 1).map((img, index) => (
+    <>
+      <Card className="w-full">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              {/* Imagen del producto */}
+              {hasImages ? (
+                <div className="relative">
+                  <Image
+                    src={allImages[0]}
+                    alt={product.name}
+                    width={60}
+                    height={60}
+                    className="rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setIsImageModalOpen(true)}
+                  />
+                  {allImages.length > 1 && (
+                    <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      {allImages.length}
+                    </div>
+                  )}
+                </div>
+              ) : (
                 <Image
-                  key={index}
-                  src={img}
-                  alt={`${product.name} ${index + 1}`}
-                  width={35}
-                  height={35}
-                  className="rounded-md object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                  src="/placeholder.svg"
+                  alt={product.name}
+                  width={60}
+                  height={60}
+                  className="rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
                   onClick={() => setIsImageModalOpen(true)}
                 />
-              ))}
+              )}
+              <div>
+                <CardTitle className="text-lg">{product.name}</CardTitle>
+                <p className="text-sm text-gray-500">{product.code}</p>
+                <Badge variant="secondary" className="mt-1">
+                  {product.category}
+                </Badge>
+              </div>
             </div>
-          )}
-          {!product.image &&
-            (!product.images || product.images.length === 0) && (
-              <Image
-                src="/placeholder.svg"
-                alt={product.name}
-                width={35}
-                height={35}
-                className="rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setIsImageModalOpen(true)}
-              />
-            )}
+                title="Ver imágenes"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setIsEditModalOpen(true)}
+                title="Editar producto"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
 
-          {/* Botón para ver/agregar imágenes */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsImageModalOpen(true)}
-            className="h-6 w-6 p-0"
-            title={hasImages ? "Ver imágenes" : "Agregar imágenes"}
-          >
-            <Eye className="h-3 w-3" />
-          </Button>
-        </div>
-      </TableCell>
-      <TableCell>
-        <span className="text-blue-600">{product.code}</span>
-      </TableCell>
-      <TableCell>
-        <span className="font-medium">{product.name}</span>
-      </TableCell>
-      <TableCell>
-        <span className="text-gray-600">{product.category}</span>
-      </TableCell>
-      <TableCell>
-        <div className="flex items-center gap-2">
-          {hasAttributes ? (
-            <>
-              {/* Mostrar solo los primeros 2 atributos como preview */}
+        <CardContent className="space-y-4">
+          {/* Atributos */}
+          {hasAttributes && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-gray-700">Atributos:</h4>
               <div className="flex flex-wrap gap-1">
                 {Object.entries(product.attributes || {})
-                  .slice(0, 2)
+                  .slice(0, 3)
                   .map(([attributeName, values], attributeIndex) => {
                     if (attributeName === "color") {
                       return (
@@ -274,11 +273,6 @@ const ProductRow: React.FC<ProductRowProps> = ({
                               );
                             }
                           })}
-                          {values.length > 2 && (
-                            <span className="text-xs text-gray-500">
-                              +{values.length - 2}
-                            </span>
-                          )}
                         </div>
                       );
                     }
@@ -292,106 +286,106 @@ const ProductRow: React.FC<ProductRowProps> = ({
                         }`}
                       >
                         {attributeName}: {values.slice(0, 2).join(", ")}
-                        {values.length > 2 && ` +${values.length - 2}`}
                       </span>
                     );
                   })}
-                {Object.keys(product.attributes || {}).length > 2 && (
-                  <span className="text-xs text-gray-500">
-                    +{Object.keys(product.attributes || {}).length - 2} más
-                  </span>
+                {Object.keys(product.attributes || {}).length > 3 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsAttributesModalOpen(true)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Eye className="h-3 w-3" />
+                  </Button>
                 )}
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsAttributesModalOpen(true)}
-                className="h-6 w-6 p-0"
+            </div>
+          )}
+
+          {/* Información de precios y stock */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-500">Precio de Compra</p>
+              <p className="font-semibold">
+                {formatToARS(parseFloat(product.buyPrice))}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Precio de Venta</p>
+              <p className="font-semibold">
+                {formatToARS(parseFloat(product.sellPrice))}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Margen</p>
+              <p
+                className={`font-semibold ${(() => {
+                  const margin = calculateMargin(
+                    parseFloat(product.buyPrice),
+                    parseFloat(product.sellPrice)
+                  );
+                  if (margin === "-") return "text-gray-600";
+                  const marginNum = Number(margin);
+                  return marginNum >= 0 ? "text-green-600" : "text-red-600";
+                })()}`}
               >
-                <Eye className="h-3 w-3" />
-              </Button>
-            </>
-          ) : (
-            <span className="text-gray-400 text-sm">Sin atributos</span>
-          )}
-        </div>
-      </TableCell>
-      <TableCell>
-        <span className="font-medium">
-          {formatToARS(parseFloat(product.buyPrice))}
-        </span>
-      </TableCell>
-      <TableCell>
-        <span className="font-medium">
-          {formatToARS(parseFloat(product.sellPrice))}
-        </span>
-      </TableCell>
-      <TableCell>
-        <span
-          className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium
-    ${(() => {
-      const margin = calculateMargin(
-        parseFloat(product.buyPrice),
-        parseFloat(product.sellPrice)
-      );
-      if (margin === "-") return "bg-gray-100 text-gray-700";
-      const marginNum = Number(margin);
-      return marginNum >= 0
-        ? "bg-green-100 text-green-700"
-        : "bg-red-100 text-red-700";
-    })()}`}
-        >
-          {calculateMargin(
-            parseFloat(product.buyPrice),
-            parseFloat(product.sellPrice)
-          )}
-          %
-        </span>
-      </TableCell>
-      <TableCell>
-        <span className="font-medium">{product.stock}</span>
-      </TableCell>
-      <TableCell>
-        {formatToARS(parseFloat(product.sellPrice) * product.stock)}
-      </TableCell>
-      <TableCell>
-        <div className="flex gap-2 justify-end">
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => setIsEditModalOpen(true)}
-            className="flex items-center gap-1"
-          >
-            <Edit className="h-4 w-4" />
-            Editar
-          </Button>
-          <Button
-            variant="destructive"
-            size="icon"
-            onClick={handleDeleteClick}
-            title="Eliminar producto"
-            disabled={isDeleting}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsBarcodeModalOpen(true)}
-            title="Ver código de barras"
-          >
-            <Barcode className="h-4 w-4" />
-          </Button>
-          <Button
-            onClick={() => handleOpenSaleModal(product._id)}
-            title="Vender producto"
-            size="sm"
-          >
-            <BadgeDollarSign className="h-4 w-4 mr-1" />
-            Vender
-          </Button>
-        </div>
-      </TableCell>
+                {calculateMargin(
+                  parseFloat(product.buyPrice),
+                  parseFloat(product.sellPrice)
+                )}
+                %
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Stock</p>
+              <p className="font-semibold">{product.stock}</p>
+            </div>
+          </div>
+
+          {/* Valor total */}
+          <div className="pt-2 border-t">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Valor Total:</span>
+              <span className="font-bold text-lg">
+                {formatToARS(parseFloat(product.sellPrice) * product.stock)}
+              </span>
+            </div>
+          </div>
+
+          {/* Botones de acción */}
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteClick}
+              className="flex-1 min-w-0 sm:min-w-[120px]"
+              disabled={isDeleting}
+            >
+              <Trash2 className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">
+                {isDeleting ? "Eliminando..." : "Eliminar"}
+              </span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsBarcodeModalOpen(true)}
+              className="flex-1 min-w-0 sm:min-w-[120px]"
+            >
+              <Barcode className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Código</span>
+            </Button>
+            <Button
+              onClick={() => handleOpenSaleModal(product._id)}
+              className="flex-1 min-w-0 sm:min-w-[120px]"
+            >
+              <BadgeDollarSign className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Vender</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Modales */}
       <ImageModal
@@ -433,8 +427,8 @@ const ProductRow: React.FC<ProductRowProps> = ({
         onClose={() => setIsBarcodeModalOpen(false)}
         onProductUpdate={onProductUpdate}
       />
-    </TableRow>
+    </>
   );
 };
 
-export default ProductRow;
+export default ProductCard;

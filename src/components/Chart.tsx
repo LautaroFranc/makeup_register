@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, BarChart3 } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -47,7 +47,7 @@ export function Chart({
     setTimeRange(value);
     handleTimeRange(value);
   };
-  console.log(chartData)
+  console.log(chartData);
   return (
     <Card>
       <CardHeader>
@@ -76,47 +76,68 @@ export function Chart({
           </SelectContent>
         </Select>
 
-        <ChartContainer config={chartConfig}>
-          <BarChart
-            accessibilityLayer
-            data={chartData}
-            layout="vertical"
-            margin={{
-              right: 16,
-            }}
-          >
-            <CartesianGrid horizontal={false} />
-            <YAxis
-              dataKey="name"
-              type="category"
-              tickLine={false}
-              tickMargin={10}
-              axisLine={false}
-              hide
-            />
-            <XAxis dataKey="totalPriceCurrent"  type="number" hide />
-            <ChartTooltip
-              cursor={true}
-              content={<ChartTooltipContent indicator="line" />}
-            />
-            <Bar dataKey="totalPriceCurrent" fill="var(--color-desktop)" radius={4}>
-              <LabelList
+        {chartData && chartData.length > 0 ? (
+          <ChartContainer config={chartConfig}>
+            <BarChart
+              accessibilityLayer
+              data={chartData}
+              layout="vertical"
+              margin={{
+                right: 16,
+              }}
+            >
+              <CartesianGrid horizontal={false} />
+              <YAxis
                 dataKey="name"
-                position="insideLeft"
-                offset={8}
-                className="fill-[--color-label]"
-                fontSize={12}
+                type="category"
+                tickLine={false}
+                tickMargin={10}
+                axisLine={false}
+                hide
               />
-              <LabelList
+              <XAxis dataKey="totalPriceCurrent" type="number" hide />
+              <ChartTooltip
+                cursor={true}
+                content={<ChartTooltipContent indicator="line" />}
+              />
+              <Bar
                 dataKey="totalPriceCurrent"
-                position="right"
-                offset={8}
-                className="fill-foreground"
-                fontSize={12}
-              />
-            </Bar>
-          </BarChart>
-        </ChartContainer>
+                fill="var(--color-desktop)"
+                radius={4}
+              >
+                <LabelList
+                  dataKey="name"
+                  position="insideLeft"
+                  offset={8}
+                  className="fill-[--color-label]"
+                  fontSize={12}
+                />
+                <LabelList
+                  dataKey="totalPriceCurrent"
+                  position="right"
+                  offset={8}
+                  className="fill-foreground"
+                  fontSize={12}
+                />
+              </Bar>
+            </BarChart>
+          </ChartContainer>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-64 text-center space-y-4">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+              <BarChart3 className="h-8 w-8 text-gray-400" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-medium text-gray-900">
+                No hay datos de ventas
+              </h3>
+              <p className="text-sm text-gray-500 max-w-sm">
+                No se encontraron ventas en el período seleccionado. Intenta
+                cambiar el rango de tiempo o realiza algunas ventas.
+              </p>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

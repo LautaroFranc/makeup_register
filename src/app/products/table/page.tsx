@@ -4,8 +4,10 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ProductTable from "@/components/table/Table";
 import SaleModal from "@/components/SaleModal";
+import { Pagination } from "@/components/ui/pagination";
 import { useFetch } from "@/hooks/useFetch";
 import { formatToARS, tokenDecode } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 // import {
 //   Select,
@@ -21,8 +23,12 @@ interface Product {
   _id: string;
   name: string;
   image?: string;
-  buyPrice: number;
-  sellPrice: number;
+  images?: string[];
+  attributes?: {
+    [key: string]: string[];
+  };
+  buyPrice: string;
+  sellPrice: string;
   stock: number;
   category: string;
   code: string;
@@ -40,12 +46,15 @@ export default function ProductDashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [totalSales, setTotalSales] = useState<number>(0);
-  const [editingCell, setEditingCell] = useState<{
-    _id: string;
-    field: string;
-  }>({
-    _id: "",
-    field: "",
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [paginationLoading, setPaginationLoading] = useState<boolean>(false);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalProducts: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
+    limit: 10,
   });
 
   const {
@@ -66,17 +75,9 @@ export default function ProductDashboard() {
   );
   // Fetch initial data
   useEffect(() => {
+    loadProducts(1);
+
     const token = localStorage.getItem("token");
-    const userToken = tokenDecode();
-
-    if (userToken) {
-      fetchProducts(`/api/products?slug=${userToken?.slug || ""}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-    }
-
     fetchSales(`/api/saleProduct`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -86,7 +87,10 @@ export default function ProductDashboard() {
 
   // Update products list and handle sales updates
   useEffect(() => {
-    if (productsData?.length) setProducts(productsData);
+    if (productsData?.products) {
+      setProducts(productsData.products);
+      setPagination(productsData.pagination);
+    }
 
     if (saleUpdateData) {
       setProducts((prevProducts) =>
@@ -115,39 +119,6 @@ export default function ProductDashboard() {
     }
   }, [salesData]);
 
-  const handleEdit = useCallback(
-    (id: string, field: string, value: string | number) => {
-      setProducts((prevProducts) =>
-        prevProducts.map((product) =>
-          product._id === id
-            ? {
-                ...product,
-                [field]: ["name", "category"].includes(field)
-                  ? value
-                  : Number(value),
-              }
-            : product
-        )
-      );
-
-      const updatedData = {
-        [field]: ["name", "category"].includes(field) ? value : Number(value),
-      };
-      const token = localStorage.getItem("token");
-
-      fetchProducts(`/api/products?id=${id}`, {
-        method: "PUT",
-        body: JSON.stringify(updatedData),
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      setEditingCell({ _id: "", field: "" });
-    },
-    [fetchProducts]
-  );
-
   const handleDelete = useCallback(
     (id: string) => {
       const token = localStorage.getItem("token");
@@ -164,11 +135,67 @@ export default function ProductDashboard() {
     [fetchProducts]
   );
 
-  const calculateMargin = (buyPrice: number, sellPrice: number) =>
-    (((sellPrice - buyPrice) / buyPrice) * 100).toFixed(2) || "0";
+  const calculateMargin = (buyPrice: number, sellPrice: number) => {
+    // Manejar casos especiales
+    if (buyPrice === 0) {
+      return "-";
+    }
+    if (sellPrice === 0) {
+      return "-100.00";
+    }
+
+    // Cálculo normal
+    const margin = ((sellPrice - buyPrice) / buyPrice) * 100;
+    return margin.toFixed(2);
+  };
 
   const handleOpenSaleModal = (productId: string) =>
     setSelectedProduct(products.find((p) => p._id === productId) || null);
+
+  const handleProductUpdate = (productId: string, updatedProduct: Product) => {
+    setProducts((prevProducts) =>
+      prevProducts.map((product) =>
+        product._id === productId ? updatedProduct : product
+      )
+    );
+  };
+
+  const loadProducts = async (page: number = 1) => {
+    const user = tokenDecode();
+    if (user) {
+      setPaginationLoading(true);
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(
+          `/api/products?slug=${user.slug}&page=${page}&limit=10`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          setProducts(data.products);
+          setPagination(data.pagination);
+          setCurrentPage(page);
+        }
+      } catch (error) {
+        console.error("Error loading products:", error);
+      } finally {
+        setPaginationLoading(false);
+      }
+    }
+  };
+
+  const handleRefresh = () => {
+    loadProducts(1);
+  };
+
+  const handlePageChange = (page: number) => {
+    loadProducts(page);
+  };
 
   const handleConfirmSale = (sale: { productId: string; quantity: number }) => {
     const product = products.find((p) => p._id === sale.productId);
@@ -196,8 +223,8 @@ export default function ProductDashboard() {
 
   const totals = products.reduce(
     (acc, product) => {
-      const profit = product.sellPrice * product.stock;
-      const cost = product.buyPrice * product.stock;
+      const profit = parseFloat(product.sellPrice) * product.stock;
+      const cost = parseFloat(product.buyPrice) * product.stock;
       return {
         totalProfit: acc.totalProfit + profit,
         totalCost: acc.totalCost + cost,
@@ -264,16 +291,48 @@ export default function ProductDashboard() {
             />
           </Card>
         </div>
-        <ProductTable
-          loading={loading}
-          products={filteredProducts}
-          editingCell={editingCell}
-          setEditingCell={setEditingCell}
-          handleEdit={handleEdit}
-          handleDelete={handleDelete}
-          calculateMargin={calculateMargin}
-          handleOpenSaleModal={handleOpenSaleModal}
-        />
+        <div className="relative">
+          <ProductTable
+            loading={loading}
+            products={filteredProducts}
+            handleDelete={handleDelete}
+            calculateMargin={calculateMargin}
+            handleOpenSaleModal={handleOpenSaleModal}
+            onProductUpdate={handleProductUpdate}
+            onRefresh={handleRefresh}
+          />
+
+          {/* Loading overlay para paginación */}
+          {paginationLoading && (
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                <span className="text-gray-600 font-medium">
+                  Cargando productos...
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Paginación */}
+        {pagination.totalPages > 1 && (
+          <div
+            className={
+              paginationLoading ? "opacity-50 pointer-events-none" : ""
+            }
+          >
+            <Pagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              onPageChange={handlePageChange}
+              hasNextPage={pagination.hasNextPage}
+              hasPrevPage={pagination.hasPrevPage}
+              totalProducts={pagination.totalProducts}
+              limit={pagination.limit}
+            />
+          </div>
+        )}
       </div>
       <SaleModal
         onClose={() => setSelectedProduct(null)}

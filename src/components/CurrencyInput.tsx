@@ -19,22 +19,41 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
   onBlur,
   placeholder = "Ingresa un precio",
 }) => {
-  const formatCurrency = (amount: number) =>
-    amount.toLocaleString("es-AR", {
+  const formatCurrency = (amount: number) => {
+    // Si el valor es NaN o no es un número válido, mostrar 0
+    if (isNaN(amount) || !isFinite(amount)) {
+      return "$0,00";
+    }
+
+    return amount.toLocaleString("es-AR", {
       style: "currency",
       currency: "ARS",
     });
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value.replace(/[^0-9]/g, ""); // Solo números
-    const numericValue = parseFloat(rawValue) / 100; // Dividir por 100 para manejar centavos
 
+    // Si está vacío, establecer en 0
+    if (rawValue === "") {
+      onChange(0);
+      return;
+    }
+
+    const numericValue = parseFloat(rawValue) / 100; // Dividir por 100 para manejar centavos
     onChange(numericValue); // Actualizar el valor real
   };
+
   const handleInputBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value.replace(/[^0-9]/g, ""); // Solo números
-    const numericValue = parseFloat(rawValue) / 100; // Dividir por 100 para manejar centavos
 
+    // Si está vacío, establecer en 0
+    if (rawValue === "") {
+      onBlur && onBlur(0);
+      return;
+    }
+
+    const numericValue = parseFloat(rawValue) / 100; // Dividir por 100 para manejar centavos
     onBlur && onBlur(numericValue);
   };
   return (

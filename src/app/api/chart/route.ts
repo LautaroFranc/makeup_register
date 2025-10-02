@@ -1,8 +1,12 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import mongoose from "mongoose";
 import SaleProduct from "@/models/SaleProduct";
-import Product from "@/models/Product"; // Asegúrate de tener este modelo
+import Product from "@/models/Product";
+import { authMiddleware } from "../middleware";
+import connectDB from "@/config/db";
+
+connectDB();
 
 interface Sale {
   idProduct: string;
@@ -17,8 +21,13 @@ interface AggregatedSale {
   totalStockSold: number;
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
+    // Verificar autenticación
+    const authCheck = await authMiddleware(req);
+    if (authCheck.status !== 200) return authCheck;
+    const { _id: userId } = (await authCheck.json()).user;
+
     const now = new Date();
     const searchParams = new URL(req.url).searchParams;
     const filter = searchParams.get("filter");
@@ -50,24 +59,37 @@ export async function GET(req: Request) {
         previousEndDate = new Date(now.getFullYear(), now.getMonth(), 0);
     }
 
-    // Obtener ventas del período actual y anterior
+    // Obtener ventas del período actual y anterior (solo del usuario logueado)
     const [salesCurrent, salesPrevious]: [any[], any[]] = await Promise.all([
-      SaleProduct.find({ createdAt: { $gte: startDate, $lte: now } }),
-      SaleProduct.find({ createdAt: { $gte: previousStartDate, $lte: previousEndDate } }),
+      SaleProduct.find({
+        user: userId,
+        createdAt: { $gte: startDate, $lte: now },
+      }),
+      SaleProduct.find({
+        user: userId,
+        createdAt: { $gte: previousStartDate, $lte: previousEndDate },
+      }),
     ]);
 
     if (!salesCurrent.length) {
-      return NextResponse.json(
-        { success: false, error: { message: "No sales found in this period" } },
-        { status: 404 }
-      );
+      return NextResponse.json({
+        success: true,
+        trendMessage: "No hay ventas en este período",
+        totalSalesCurrent: 0,
+        totalSalesPrevious: 0,
+        percentageChange: 0,
+        productComparison: [],
+      });
     }
 
     // Función para calcular ventas agregadas por producto
     const aggregateSales = async (sales: Sale[]) => {
       const result = await Promise.all(
         sales.map(async (sale) => {
-          const product = await Product.findOne({ _id: sale.idProduct });
+          const product = await Product.findOne({
+            _id: sale.idProduct,
+            user: userId,
+          });
           return {
             idProduct: sale.idProduct,
             name: product?.name,
@@ -100,19 +122,29 @@ export async function GET(req: Request) {
     ]);
 
     // Calcular ventas totales de cada período
-    const totalSalesCurrent = aggregatedCurrent.reduce((sum, product) => sum + product.totalPrice, 0);
-    const totalSalesPrevious = aggregatedPrevious.reduce((sum, product) => sum + product.totalPrice, 0);
+    const totalSalesCurrent = aggregatedCurrent.reduce(
+      (sum, product) => sum + product.totalPrice,
+      0
+    );
+    const totalSalesPrevious = aggregatedPrevious.reduce(
+      (sum, product) => sum + product.totalPrice,
+      0
+    );
 
     // Calcular el porcentaje de variación
     const percentageChange =
-      totalSalesPrevious === 0 ? 100 : ((totalSalesCurrent - totalSalesPrevious) / totalSalesPrevious) * 100;
+      totalSalesPrevious === 0
+        ? 100
+        : ((totalSalesCurrent - totalSalesPrevious) / totalSalesPrevious) * 100;
 
     // Determinar mensaje de tendencia
     let trendMessage = "Sin cambios";
     if (percentageChange > 0) {
       trendMessage = `Tendencia al alza del ${percentageChange.toFixed(2)}%`;
     } else if (percentageChange < 0) {
-      trendMessage = `Tendencia a la baja del ${Math.abs(percentageChange).toFixed(2)}%`;
+      trendMessage = `Tendencia a la baja del ${Math.abs(
+        percentageChange
+      ).toFixed(2)}%`;
     }
 
     // Generar array comparativo de productos
@@ -122,7 +154,10 @@ export async function GET(req: Request) {
       );
 
       const previousTotal = previousProduct ? previousProduct.totalPrice : 0;
-      const change = previousTotal === 0 ? 100 : ((currentProduct.totalPrice - previousTotal) / previousTotal) * 100;
+      const change =
+        previousTotal === 0
+          ? 100
+          : ((currentProduct.totalPrice - previousTotal) / previousTotal) * 100;
 
       return {
         idProduct: currentProduct.idProduct,
@@ -131,7 +166,8 @@ export async function GET(req: Request) {
         totalStockSoldCurrent: currentProduct.totalStockSold,
         totalPricePrevious: previousTotal,
         totalStockSoldPrevious: previousProduct?.totalStockSold || 0,
-        percentageChange: previousTotal === 0 ? 100 : parseFloat(change.toFixed(2)),
+        percentageChange:
+          previousTotal === 0 ? 100 : parseFloat(change.toFixed(2)),
       };
     });
 

@@ -4,10 +4,11 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/toaster";
+import { UserProviderWrapper } from "@/components/providers/UserProviderWrapper";
 import { usePathname } from "next/navigation";
 import "./globals.css";
 import { useEffect } from "react";
-import { useRouter } from 'next/navigation';
+import { useRouter } from "next/navigation";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,22 +25,23 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const pathname = usePathname(); 
+  const pathname = usePathname();
   const router = useRouter();
 
- useEffect(() =>{
-  if(![pathname].includes("/login") ){
-    const token = localStorage.getItem("token");
-    if(!token){
-      router.push('/login');
+  useEffect(() => {
+    if (![pathname].includes("/login")) {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+      }
     }
-  }
- },[pathname])
+  }, [pathname]);
   return (
-      <html lang="en">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-100`}
-        >
+    <html lang="en">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-100`}
+      >
+        <UserProviderWrapper>
           <SidebarProvider>
             {![pathname].includes("/login") ? <AppSidebar /> : null}
 
@@ -49,7 +51,8 @@ export default function RootLayout({
               <Toaster />
             </main>
           </SidebarProvider>
-        </body>
-      </html>
+        </UserProviderWrapper>
+      </body>
+    </html>
   );
 }

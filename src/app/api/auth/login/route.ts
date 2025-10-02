@@ -29,10 +29,13 @@ export async function POST(request: Request) {
     }
 
     // Generar token JWT
-    const token = jwt.sign(
-      { id: user._id, email: user.email, slug: user.slug },
-      process.env.JWT_SECRET || ""
-    );
+    const tokenPayload = {
+      userId: user._id,
+      email: user.email,
+      slug: user.slug,
+    };
+
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || "");
 
     return NextResponse.json({ success: true, token }, { status: 200 });
   } catch (error: any) {

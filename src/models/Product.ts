@@ -4,10 +4,15 @@ export interface IProduct extends Document {
   name: string;
   description: string;
   image: string;
+  images: string[]; // Múltiples imágenes
+  attributes: {
+    [key: string]: string[]; // Atributos dinámicos: { "color": ["rojo", "azul"], "tamaño": ["S", "M", "L"] }
+  };
   buyPrice: string;
   sellPrice: string;
   stock: number;
   code: string;
+  barcode: string; // Código de barras EAN-13/EAN-8
   user: string;
   category: string;
 }
@@ -18,6 +23,11 @@ const ProductSchema: Schema<IProduct> = new Schema(
       type: String,
       required: true,
     },
+    barcode: {
+      type: String,
+      required: true,
+      unique: true,
+    },
     description: {
       type: String,
     },
@@ -27,6 +37,14 @@ const ProductSchema: Schema<IProduct> = new Schema(
     },
     image: {
       type: String,
+    },
+    images: {
+      type: [String],
+      default: [],
+    },
+    attributes: {
+      type: Schema.Types.Mixed,
+      default: {},
     },
     buyPrice: {
       type: String,

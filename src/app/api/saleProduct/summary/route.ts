@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
       endDate: Date
     ): Promise<SaleStats> => {
       const sales = await SaleProduct.find({
+        user: userId,
         createdAt: { $gte: startDate, $lt: endDate },
       });
 
@@ -99,8 +100,9 @@ export async function GET(req: NextRequest) {
       previousMonthSales.totalCost
     );
 
-    // Obtener productos vendidos este mes
+    // Obtener productos vendidos este mes (solo del usuario logueado)
     const soldProducts = await SaleProduct.find({
+      user: userId,
       createdAt: { $gte: firstDayCurrentMonth, $lt: now },
     });
 

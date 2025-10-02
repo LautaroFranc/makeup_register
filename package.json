@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-label": "^2.1.1",
     "@radix-ui/react-popover": "^1.1.6",
@@ -26,12 +27,14 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "formidable": "^3.5.2",
+    "jsbarcode": "^3.12.1",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.471.2",
     "mongoose": "^8.9.5",
     "next": "15.1.4",
     "react": "^19.0.0",
+    "react-barcode": "^1.6.1",
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.0",

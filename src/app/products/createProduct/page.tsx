@@ -10,6 +10,8 @@ import { CurrencyInput } from "@/components/CurrencyInput";
 import { useFetch } from "@/hooks/useFetch";
 import { Product } from "@/interface/product";
 import { CategorySelector } from "@/components/CategorySelect";
+import { ImageUploadSquare } from "@/components/ImageUploadSquare";
+import { DynamicAttributes } from "@/components/DynamicAttributes";
 
 const ProductForm = () => {
   const [name, setName] = useState("");
@@ -19,7 +21,9 @@ const ProductForm = () => {
   const [salePrice, setSalePrice] = useState(0); // Precio de venta
   const [stock, setStock] = useState(0);
   const [category, setCategory] = useState("");
-  const [image, setImage] = useState<File | null>(null);
+  const [images, setImages] = useState<string[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<File[]>([]);
+  const [attributes, setAttributes] = useState<{ [key: string]: string[] }>({});
   const { toast } = useToast();
   const { data, error, loading, fetchData } = useFetch<Product[]>();
 
@@ -37,12 +41,6 @@ const ProductForm = () => {
     setMargin(Number(newMargin.toFixed(2)));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setImage(e.target.files[0]);
-    }
-  };
-
   useEffect(() => {
     if (data) {
       toast({
@@ -55,8 +53,10 @@ const ProductForm = () => {
       setMargin(0);
       setSalePrice(0);
       setCategory("");
-      setImage(null);
       setStock(0);
+      setImages([]);
+      setUploadedImages([]);
+      setAttributes({});
     }
   }, [data]);
   useEffect(() => {
@@ -78,9 +78,12 @@ const ProductForm = () => {
     formData.append("sellPrice", salePrice + "");
     formData.append("stock", stock + "");
     formData.append("category", category + "");
-    if (image) {
-      formData.append("image", image);
-    }
+    formData.append("attributes", JSON.stringify(attributes));
+
+    // Agregar múltiples imágenes
+    uploadedImages.forEach((img, index) => {
+      formData.append(`images`, img);
+    });
     const token = localStorage.getItem("token");
     fetchData("/api/products", {
       method: "POST",
@@ -92,109 +95,143 @@ const ProductForm = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-white shadow-md rounded-md">
-      <h2 className="text-xl font-semibold mb-4">Crear Producto</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Nombre */}
-        <div>
-          <Label htmlFor="name">Nombre</Label>
-          <Input
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nombre del producto"
-            required
+    <div className="max-w-6xl mx-auto p-6 bg-white shadow-md rounded-md">
+      <h2 className="text-2xl font-semibold mb-6 text-center">
+        Crear Producto
+      </h2>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Información Básica */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+            Información Básica
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Nombre */}
+            <div className="md:col-span-2">
+              <Label htmlFor="name">Nombre del Producto</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Nombre del producto"
+                required
+              />
+            </div>
+
+            {/* Descripción */}
+            <div className="md:col-span-2">
+              <Label htmlFor="description">Descripción</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Descripción del producto"
+                required
+                rows={3}
+              />
+            </div>
+
+            {/* Categoría */}
+            <div>
+              <Label htmlFor="category">Categoría</Label>
+              <CategorySelector value={category} onChange={setCategory} />
+            </div>
+
+            {/* Stock */}
+            <div>
+              <Label htmlFor="stock">Stock</Label>
+              <Input
+                id="stock"
+                type="number"
+                value={stock}
+                onChange={(e) => setStock(Number(e.target.value))}
+                placeholder="Cantidad en stock"
+                required
+                min="0"
+                step="1"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Precios */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+            Precios y Margen
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Precio de compra */}
+            <div>
+              <CurrencyInput
+                label="Precio de Compra ($)"
+                value={price}
+                onChange={(value) => {
+                  setPrice(value);
+                }}
+              />
+            </div>
+
+            {/* Margen */}
+            <div>
+              <Label htmlFor="margin">Margen (%)</Label>
+              <Input
+                id="margin"
+                type="number"
+                value={margin}
+                onChange={(e) => handleMarginChange(Number(e.target.value))}
+                placeholder="Margen (%)"
+                required
+                disabled={!Boolean(price)}
+              />
+            </div>
+
+            {/* Precio de venta */}
+            <div>
+              <CurrencyInput
+                label="Precio de Venta ($)"
+                value={salePrice}
+                onChange={(value) => handleSalePriceChange(value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Imágenes */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+            Imágenes del Producto
+          </h3>
+          <ImageUploadSquare
+            images={images}
+            onImagesChange={setImages}
+            uploadedImages={uploadedImages}
+            onUploadedImagesChange={setUploadedImages}
           />
         </div>
 
-        {/* Descripción */}
-        <div>
-          <Label htmlFor="description">Descripción</Label>
-          <Textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Descripción del producto"
-            required
-          />
-        </div>
-
-        {/* Precio de compra */}
-        <div>
-          <CurrencyInput
-            label="Precio original ($)"
-            value={price}
-            onChange={(value) => {
-              setPrice(value);
-            }}
-          />
-        </div>
-
-        {/* Margen */}
-        <div>
-          <Label htmlFor="margin">Margen (%)</Label>
-          <Input
-            id="margin"
-            type="number"
-            value={margin}
-            onChange={(e) => handleMarginChange(Number(e.target.value))}
-            placeholder="Margen (%)"
-            required
-            disabled={!Boolean(price)}
-            min="0"
-            step="10"
-          />
-        </div>
-
-        {/* Precio de venta */}
-        <div>
-          <CurrencyInput
-            label="Precio de reventa ($)"
-            value={salePrice}
-            onChange={(value) => handleSalePriceChange(value)}
-          />
-        </div>
-
-        {/* STOCK  */}
-        <div>
-          <Label htmlFor="stock">Stock</Label>
-          <Input
-            id="stock"
-            type="number"
-            value={stock}
-            onChange={(e) => setStock(Number(e.target.value))}
-            placeholder="Stock"
-            required
-            min="0"
-            step="1"
-          />
-        </div>
-        {/* Categoría */}
-        <div>
-          <Label htmlFor="category">Categoría</Label>
-          <CategorySelector value={category} onChange={setCategory} />
-        </div>
-
-        {/* Subir Imagen */}
-        <div>
-          <Label htmlFor="image">Imagen</Label>
-          <Input
-            id="image"
-            type="file"
-            accept="image/*"
-            onChange={handleImageChange}
-          />
-          {image && (
-            <p className="text-sm text-gray-600 mt-2">
-              Imagen seleccionada: {image.name}
-            </p>
-          )}
+        {/* Atributos Dinámicos */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+            Atributos del Producto
+          </h3>
+          <div>
+            <DynamicAttributes
+              attributes={attributes}
+              onAttributesChange={setAttributes}
+            />
+          </div>
         </div>
 
         {/* Botón */}
-        <Button type="submit" disabled={loading} className="w-full">
-          {loading ? "Cargando..." : "Crear Producto"}
-        </Button>
+        <div className="flex justify-center pt-4">
+          <Button
+            type="submit"
+            disabled={loading}
+            className="px-8 py-3 text-lg font-medium min-w-[200px]"
+          >
+            {loading ? "Cargando..." : "Crear Producto"}
+          </Button>
+        </div>
       </form>
     </div>
   );

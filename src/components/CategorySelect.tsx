@@ -18,18 +18,33 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { createPortal } from "react-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useFetch } from "@/hooks/useFetch";
 
 interface CategorySelectorProps {
   value: string;
   onChange: (value: string) => void;
+  inModal?: boolean;
 }
 
-export function CategorySelector({ value, onChange }: CategorySelectorProps) {
+export function CategorySelector({
+  value,
+  onChange,
+  inModal = false,
+}: CategorySelectorProps) {
   const [open, setOpen] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState("");
+  const [newCategoryInput, setNewCategoryInput] = useState("");
   const { toast } = useToast();
   const {
     data: categoryData,
@@ -63,14 +78,58 @@ export function CategorySelector({ value, onChange }: CategorySelectorProps) {
   }, [errorCategory]);
   const addNewCategory = async () => {
     if (!inputValue.trim()) return;
-      setCategories((prev) => [...prev, inputValue]);
-      onChange(inputValue);
-      setOpen(false);
+    setCategories((prev) => [...prev, inputValue]);
+    onChange(inputValue);
+    setOpen(false);
+  };
+
+  const addNewCategoryFromInput = () => {
+    if (!newCategoryInput.trim()) return;
+    setCategories((prev) => [...prev, newCategoryInput]);
+    onChange(newCategoryInput);
+    setNewCategoryInput("");
   };
 
   useEffect(() => {
     fetchCategories();
   }, []);
+
+  if (inModal) {
+    return (
+      <div className="space-y-2">
+        <Select value={value} onValueChange={onChange}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Seleccionar categoría..." />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map((category) => (
+              <SelectItem key={category} value={category}>
+                {category}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Input para agregar nueva categoría */}
+        <div className="flex gap-2">
+          <Input
+            placeholder="Nueva categoría..."
+            value={newCategoryInput}
+            onChange={(e) => setNewCategoryInput(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && addNewCategoryFromInput()}
+          />
+          <Button
+            type="button"
+            size="sm"
+            onClick={addNewCategoryFromInput}
+            disabled={!newCategoryInput.trim()}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -85,7 +144,7 @@ export function CategorySelector({ value, onChange }: CategorySelectorProps) {
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-0">
+      <PopoverContent className="w-[300px] p-0 z-[70]">
         <Command>
           <CommandInput
             placeholder="Buscar categoría..."
@@ -99,7 +158,10 @@ export function CategorySelector({ value, onChange }: CategorySelectorProps) {
                 variant="ghost"
                 size="sm"
                 className="mt-2 w-full justify-start"
-                onClick={addNewCategory}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  addNewCategory();
+                }}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Añadir "{inputValue}"
@@ -113,6 +175,9 @@ export function CategorySelector({ value, onChange }: CategorySelectorProps) {
                   onSelect={(currentValue) => {
                     onChange(currentValue);
                     setOpen(false);
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
                   }}
                 >
                   <Check
@@ -129,7 +194,12 @@ export function CategorySelector({ value, onChange }: CategorySelectorProps) {
               <>
                 <CommandSeparator />
                 <CommandGroup heading="Crear nueva categoría">
-                  <CommandItem onSelect={addNewCategory}>
+                  <CommandItem
+                    onSelect={addNewCategory}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
                     <Plus className="mr-2 h-4 w-4" />
                     Añadir "{inputValue}"
                   </CommandItem>
