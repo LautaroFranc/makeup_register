@@ -24,11 +24,15 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const { barcode } = body;
+    const { barcode, published } = body;
 
-    if (!barcode) {
+    // Validar que al menos un campo esté presente
+    if (barcode === undefined && published === undefined) {
       return NextResponse.json(
-        { success: false, error: "Código de barras requerido" },
+        {
+          success: false,
+          error: "Se requiere al menos un campo para actualizar",
+        },
         { status: 400 }
       );
     }
@@ -42,27 +46,38 @@ export async function PUT(
       );
     }
 
-    // Verificar que el código de barras no esté en uso por otro producto
-    const existingProduct = await Product.findOne({
-      barcode,
-      _id: { $ne: productId },
-    });
+    // Si se está actualizando el barcode, verificar que no esté en uso
+    if (barcode !== undefined) {
+      const existingProduct = await Product.findOne({
+        barcode,
+        _id: { $ne: productId },
+      });
 
-    if (existingProduct) {
-      return NextResponse.json(
-        { success: false, error: "El código de barras ya está en uso" },
-        { status: 400 }
-      );
+      if (existingProduct) {
+        return NextResponse.json(
+          { success: false, error: "El código de barras ya está en uso" },
+          { status: 400 }
+        );
+      }
     }
+
+    // Preparar los campos a actualizar
+    const updateData: any = {};
+    if (barcode !== undefined) updateData.barcode = barcode;
+    if (published !== undefined) updateData.published = published;
 
     // Actualizar el producto
     const updatedProduct = await Product.findByIdAndUpdate(
       productId,
-      { barcode },
+      updateData,
       { new: true, runValidators: true }
     );
 
-    return NextResponse.json(updatedProduct);
+    return NextResponse.json({
+      success: true,
+      data: updatedProduct,
+      message: "Producto actualizado exitosamente",
+    });
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error.message },

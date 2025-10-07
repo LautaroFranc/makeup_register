@@ -2,35 +2,47 @@ import { NextRequest, NextResponse } from "next/server";
 import Category from "@/models/Category";
 import Product from "@/models/Product";
 import connectDB from "@/config/db";
-import { authMiddleware } from "../middleware";
+import { authMiddleware } from "../../middleware";
 
 connectDB();
 
+// GET - Obtener solo categorías públicas del usuario autenticado
 export async function GET(req: NextRequest) {
   try {
     const authCheck = await authMiddleware(req);
     if (authCheck.status !== 200) return authCheck;
     const { _id } = (await authCheck.json()).user;
 
-    // Obtener categorías del nuevo modelo
-    const categories = await Category.find({ user: _id, isActive: true })
+    // Obtener categorías que tienen al menos un producto publicado
+    const categoriesWithPublicProducts = await Product.distinct("category", {
+      user: _id,
+      published: true,
+    });
+
+    // Obtener información completa de estas categorías
+    const categories = await Category.find({
+      user: _id,
+      name: { $in: categoriesWithPublicProducts },
+      isActive: true,
+    })
       .sort({ name: 1 })
       .select("name description color icon productCount");
 
-    // Obtener estadísticas actualizadas de cada categoría
+    // Obtener estadísticas de productos publicados por categoría
     const categoriesWithStats = await Promise.all(
       categories.map(async (category) => {
-        const products = await Product.find({
+        const publicProducts = await Product.find({
           user: _id,
           category: category.name,
+          published: true,
         });
 
-        const totalProducts = products.length;
-        const totalStock = products.reduce(
+        const totalProducts = publicProducts.length;
+        const totalStock = publicProducts.reduce(
           (sum, product) => sum + product.stock,
           0
         );
-        const totalValue = products.reduce((sum, product) => {
+        const totalValue = publicProducts.reduce((sum, product) => {
           const buyPrice = parseFloat(product.buyPrice) || 0;
           return sum + buyPrice * product.stock;
         }, 0);
@@ -51,9 +63,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       categories: categoriesWithStats,
+      message: "Categorías públicas obtenidas exitosamente",
     });
   } catch (error: any) {
-    console.error("Error fetching categories:", error);
+    console.error("Error fetching public categories:", error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { X, Save, Upload, Loader2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { CategorySelector } from "@/components/CategorySelect";
 import { ImageUploadSquare } from "@/components/ImageUploadSquare";
@@ -32,6 +33,7 @@ interface Product {
   stock: number;
   code: string;
   category: string;
+  published: boolean;
 }
 
 interface ProductEditModalProps {
@@ -57,6 +59,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
     stock: 0,
     category: "",
     margin: 0,
+    published: true,
   });
   const [image, setImage] = useState<string>("");
   const [images, setImages] = useState<string[]>([]);
@@ -78,6 +81,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
         stock: product.stock,
         category: product.category,
         margin: 0,
+        published: product.published,
       });
       setImage(product.image || "");
       setImages(product.images || []);
@@ -219,6 +223,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
           category: formData.category,
           images: images,
           attributes: attributes,
+          published: formData.published,
         };
 
         onSave(updatedProduct);
@@ -452,6 +457,30 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
                 attributes={attributes}
                 onAttributesChange={setAttributes}
               />
+            </div>
+
+            {/* Configuración de Visibilidad */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                Configuración de Visibilidad
+              </h3>
+              <div className="flex items-center space-x-3">
+                <Switch
+                  id="published"
+                  checked={formData.published}
+                  onCheckedChange={(checked) =>
+                    handleInputChange("published", checked)
+                  }
+                />
+                <Label htmlFor="published" className="text-sm font-medium">
+                  {formData.published ? "Producto Público" : "Producto Privado"}
+                </Label>
+              </div>
+              <p className="text-xs text-gray-500">
+                {formData.published
+                  ? "Este producto será visible en catálogos públicos"
+                  : "Este producto solo será visible en tu panel privado"}
+              </p>
             </div>
 
             {/* Botones */}

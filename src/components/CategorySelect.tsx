@@ -42,7 +42,7 @@ export function CategorySelector({
   inModal = false,
 }: CategorySelectorProps) {
   const [open, setOpen] = useState(false);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [newCategoryInput, setNewCategoryInput] = useState("");
   const { toast } = useToast();
@@ -51,11 +51,11 @@ export function CategorySelector({
     error: errorCategory,
     loading: loadingCategory,
     fetchData: fetchCategory,
-  } = useFetch<[]>();
+  } = useFetch<any>();
 
   const fetchCategories = async () => {
     const token = localStorage.getItem("token");
-    fetchCategory("/api/category", {
+    fetchCategory("api/categories", {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -63,8 +63,19 @@ export function CategorySelector({
     });
   };
   useEffect(() => {
+    console.log(categoryData);
     if (categoryData) {
-      setCategories(categoryData);
+      // Manejar tanto la respuesta antigua (array) como la nueva (objeto con categories)
+      if (Array.isArray(categoryData)) {
+        setCategories(categoryData);
+      } else if (
+        categoryData.categories &&
+        Array.isArray(categoryData.categories)
+      ) {
+        setCategories(categoryData.categories);
+      } else {
+        setCategories([]);
+      }
     }
   }, [categoryData]);
   useEffect(() => {
@@ -78,16 +89,90 @@ export function CategorySelector({
   }, [errorCategory]);
   const addNewCategory = async () => {
     if (!inputValue.trim()) return;
-    setCategories((prev) => [...prev, inputValue]);
-    onChange(inputValue);
-    setOpen(false);
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("api/categories", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: inputValue.trim(),
+          description: "",
+          color: "#3B82F6",
+          icon: "📦",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Agregar la nueva categoría a la lista local
+        setCategories((prev) => [...prev, result.category]);
+        onChange(inputValue);
+        setOpen(false);
+        toast({
+          title: "Éxito",
+          description: "Categoría creada exitosamente",
+          variant: "default",
+        });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error("Error creating category:", error);
+      toast({
+        title: "Error",
+        description: `No se pudo crear la categoría: ${error}`,
+        variant: "destructive",
+      });
+    }
   };
 
-  const addNewCategoryFromInput = () => {
+  const addNewCategoryFromInput = async () => {
     if (!newCategoryInput.trim()) return;
-    setCategories((prev) => [...prev, newCategoryInput]);
-    onChange(newCategoryInput);
-    setNewCategoryInput("");
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/categories", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: newCategoryInput.trim(),
+          description: "",
+          color: "#3B82F6",
+          icon: "📦",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Agregar la nueva categoría a la lista local
+        setCategories((prev) => [...prev, result.category]);
+        onChange(newCategoryInput);
+        setNewCategoryInput("");
+        toast({
+          title: "Éxito",
+          description: "Categoría creada exitosamente",
+          variant: "default",
+        });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error("Error creating category:", error);
+      toast({
+        title: "Error",
+        description: `No se pudo crear la categoría: ${error}`,
+        variant: "destructive",
+      });
+    }
   };
 
   useEffect(() => {
@@ -102,11 +187,19 @@ export function CategorySelector({
             <SelectValue placeholder="Seleccionar categoría..." />
           </SelectTrigger>
           <SelectContent>
-            {categories.map((category) => (
-              <SelectItem key={category} value={category}>
-                {category}
-              </SelectItem>
-            ))}
+            {categories.map((category) => {
+              // Manejar tanto strings como objetos
+              const categoryName =
+                typeof category === "string" ? category : category.name;
+              const categoryValue =
+                typeof category === "string" ? category : category.name;
+
+              return (
+                <SelectItem key={categoryName} value={categoryValue}>
+                  {categoryName}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
 
@@ -168,44 +261,56 @@ export function CategorySelector({
               </Button>
             </CommandEmpty>
             <CommandGroup heading="Categorías existentes">
-              {categories.map((category) => (
-                <CommandItem
-                  key={category}
-                  value={category}
-                  onSelect={(currentValue) => {
-                    onChange(currentValue);
-                    setOpen(false);
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === category ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {category}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-            {inputValue && !categories.includes(inputValue) && (
-              <>
-                <CommandSeparator />
-                <CommandGroup heading="Crear nueva categoría">
+              {categories.map((category) => {
+                // Manejar tanto strings como objetos
+                const categoryName =
+                  typeof category === "string" ? category : category.name;
+                const categoryValue =
+                  typeof category === "string" ? category : category.name;
+
+                return (
                   <CommandItem
-                    onSelect={addNewCategory}
+                    key={categoryName}
+                    value={categoryValue}
+                    onSelect={(currentValue) => {
+                      onChange(currentValue);
+                      setOpen(false);
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
                     }}
                   >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Añadir "{inputValue}"
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === categoryValue ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {categoryName}
                   </CommandItem>
-                </CommandGroup>
-              </>
-            )}
+                );
+              })}
+            </CommandGroup>
+            {inputValue &&
+              !categories.some((cat) => {
+                const categoryName = typeof cat === "string" ? cat : cat.name;
+                return categoryName === inputValue;
+              }) && (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup heading="Crear nueva categoría">
+                    <CommandItem
+                      onSelect={addNewCategory}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Añadir "{inputValue}"
+                    </CommandItem>
+                  </CommandGroup>
+                </>
+              )}
           </CommandList>
         </Command>
       </PopoverContent>

@@ -14,6 +14,7 @@ export interface Product {
   barcode: string;
   category: string;
   user: string;
+  published: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

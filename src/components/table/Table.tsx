@@ -28,6 +28,7 @@ interface Product {
   barcode: string;
   category: string;
   user: string;
+  published: boolean;
 }
 
 interface EditingCell {

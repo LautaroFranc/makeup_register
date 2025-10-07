@@ -9,6 +9,7 @@ import {
   User,
   LogOut,
   Settings,
+  Tags,
 } from "lucide-react";
 
 import {
@@ -56,6 +57,11 @@ const items = [
     ],
   },
 
+  {
+    title: "Configuración",
+    url: "/settings",
+    icon: Settings,
+  },
   {
     title: "Planificacion",
     url: "#",

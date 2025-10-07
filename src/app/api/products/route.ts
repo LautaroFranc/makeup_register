@@ -21,8 +21,14 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug");
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
+    const limit = Math.min(parseInt(searchParams.get("limit") || "10"), 50); // Máximo 50 productos
     const skip = (page - 1) * limit;
+
+    // Filtros
+    const category = searchParams.get("category");
+    const published = searchParams.get("published");
+    const stockFilter = searchParams.get("stock"); // "in-stock", "low-stock", "out-of-stock"
+    const search = searchParams.get("search");
 
     if (!slug) {
       return NextResponse.json(
@@ -40,17 +46,69 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Obtener productos con paginación
-    const products = await Product.find({ user: user._id })
+    // Construir filtros de consulta
+    const query: any = {
+      user: user._id,
+    };
+
+    // Filtro de visibilidad
+    if (published !== null) {
+      query.published = published === "true";
+    } else {
+      // Por defecto, solo productos publicados para usuarios no autenticados
+      query.published = true;
+    }
+
+    // Filtro de categoría
+    if (category && category !== "all") {
+      query.category = category;
+    }
+
+    // Filtro de stock
+    if (stockFilter) {
+      switch (stockFilter) {
+        case "in-stock":
+          query.stock = { $gt: 0 };
+          break;
+        case "low-stock":
+          query.stock = { $gt: 0, $lte: 5 };
+          break;
+        case "out-of-stock":
+          query.stock = 0;
+          break;
+      }
+    }
+
+    // Filtro de búsqueda
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Obtener productos con filtros y paginación
+    const products = await Product.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .select(
+        "name description image images sellPrice category barcode stock published"
+      ); // Incluir stock y published para filtros
 
-    // Contar total de productos para calcular páginas
-    const totalProducts = await Product.countDocuments({ user: user._id });
+    // Contar total de productos con filtros para calcular páginas
+    const totalProducts = await Product.countDocuments(query);
     const totalPages = Math.ceil(totalProducts / limit);
 
+    // Obtener categorías disponibles para este usuario (para filtros)
+    const availableCategories = await Product.distinct("category", {
+      user: user._id,
+      published: query.published,
+    });
+
     return NextResponse.json({
+      success: true,
       products,
       pagination: {
         currentPage: page,
@@ -59,6 +117,15 @@ export async function GET(req: NextRequest) {
         hasNextPage: page < totalPages,
         hasPrevPage: page > 1,
         limit,
+      },
+      filters: {
+        availableCategories,
+        appliedFilters: {
+          category,
+          published,
+          stock: stockFilter,
+          search,
+        },
       },
     });
   } catch (error: any) {
@@ -285,6 +352,8 @@ export async function PUT(req: NextRequest) {
       category: productData.category,
       attributes: JSON.parse(productData.attributes || "{}"),
       images: updatedImages,
+      published:
+        productData.published === "true" || productData.published === true,
     };
 
     // Agregar imagen principal si se subió una nueva

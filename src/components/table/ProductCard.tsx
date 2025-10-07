@@ -1,9 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, BadgeDollarSign, Eye, Edit, Barcode } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import {
+  Trash2,
+  BadgeDollarSign,
+  Eye,
+  Edit,
+  Barcode,
+  MoreVertical,
+  EyeOff,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatToARS } from "@/lib/utils";
 import { ImageModal } from "@/components/ImageModal";
 import { AttributesModal } from "@/components/AttributesModal";
@@ -28,6 +44,7 @@ interface Product {
   barcode: string;
   category: string;
   user: string;
+  published: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -57,6 +74,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [localImages, setLocalImages] = useState<string[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const { toast } = useToast();
 
   // Inicializar imágenes locales cuando cambie el producto
@@ -84,8 +102,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const handleAddImages = async (newImages: File[]) => {
     setIsUploadingImages(true);
     try {
-      console.log("Agregando imágenes al producto:", product._id, newImages);
-
       // Crear FormData para enviar las imágenes
       const formData = new FormData();
       formData.append("productId", product._id);
@@ -128,7 +144,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
         });
       }
     } catch (error) {
-      console.error("Error al agregar imágenes:", error);
       toast({
         description: "Error de conexión al agregar imágenes",
         variant: "destructive",
@@ -138,17 +153,37 @@ const ProductCard: React.FC<ProductCardProps> = ({
     }
   };
 
-  const handleSaveProduct = (updatedProduct: any) => {
-    // Notificar al componente padre sobre la actualización
-    if (onProductUpdate) {
-      onProductUpdate(product._id, updatedProduct);
-    }
-    setIsEditModalOpen(false);
-  };
+  const handleSaveProduct = useCallback(
+    (updatedProduct: any) => {
+      // Notificar al componente padre sobre la actualización
+      if (onProductUpdate) {
+        onProductUpdate(product._id, updatedProduct);
+      }
+      setIsEditModalOpen(false);
+      setIsDropdownOpen(false);
+    },
+    [onProductUpdate, product._id]
+  );
 
-  const handleDeleteClick = () => {
+  const handleDeleteClick = useCallback(() => {
     setIsDeleteModalOpen(true);
-  };
+    setIsDropdownOpen(false);
+  }, []);
+
+  const handleEditClick = useCallback(() => {
+    setIsEditModalOpen(true);
+    setIsDropdownOpen(false);
+  }, []);
+
+  const handleBarcodeClick = useCallback(() => {
+    setIsBarcodeModalOpen(true);
+    setIsDropdownOpen(false);
+  }, []);
+
+  const handleImageClick = useCallback(() => {
+    setIsImageModalOpen(true);
+    setIsDropdownOpen(false);
+  }, []);
 
   const handleConfirmDelete = async () => {
     setIsDeleting(true);
@@ -166,6 +201,49 @@ const ProductCard: React.FC<ProductCardProps> = ({
       });
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleToggleVisibility = async (published: boolean) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`/api/products/${product._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ published }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Actualizar el producto local
+        if (onProductUpdate) {
+          onProductUpdate(product._id, { ...product, published });
+        }
+
+        toast({
+          description: `Producto ${
+            published ? "publicado" : "oculto"
+          } exitosamente`,
+          variant: "default",
+        });
+      } else {
+        toast({
+          description: `Error al ${
+            published ? "publicar" : "ocultar"
+          } el producto`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error al cambiar visibilidad:", error);
+      toast({
+        description: "Error de conexión",
+        variant: "destructive",
+      });
     }
   };
 
@@ -203,30 +281,62 @@ const ProductCard: React.FC<ProductCardProps> = ({
                 />
               )}
               <div>
-                <CardTitle className="text-lg">{product.name}</CardTitle>
+                <CardTitle className="text-sm sm:text-base md:text-lg line-clamp-2">
+                  {product.name}
+                </CardTitle>
                 <p className="text-sm text-gray-500">{product.code}</p>
                 <Badge variant="secondary" className="mt-1">
                   {product.category}
                 </Badge>
               </div>
             </div>
-            <div className="flex gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsImageModalOpen(true)}
-                title="Ver imágenes"
+            <div className="flex items-center gap-2">
+              {/* Switch de visibilidad */}
+              <div className="flex items-center gap-1">
+                <Switch
+                  checked={product.published}
+                  onCheckedChange={handleToggleVisibility}
+                  className="data-[state=checked]:bg-green-600"
+                />
+                <span className="text-xs text-gray-500">
+                  {product.published ? "Visible" : "Oculto"}
+                </span>
+              </div>
+
+              {/* Menú de acciones */}
+              <DropdownMenu
+                open={isDropdownOpen}
+                onOpenChange={setIsDropdownOpen}
               >
-                <Eye className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setIsEditModalOpen(true)}
-                title="Editar producto"
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-8 w-8">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={handleImageClick}>
+                    <Eye className="h-4 w-4 mr-2" />
+                    Ver imágenes
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleEditClick}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar producto
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleBarcodeClick}>
+                    <Barcode className="h-4 w-4 mr-2" />
+                    Ver código de barras
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleDeleteClick}
+                    className="text-red-600 focus:text-red-600"
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar producto
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </CardHeader>
@@ -348,41 +458,20 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <div className="pt-2 border-t">
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500">Valor Total:</span>
-              <span className="font-bold text-lg">
+              <span className="font-bold text-sm sm:text-base md:text-lg">
                 {formatToARS(parseFloat(product.sellPrice) * product.stock)}
               </span>
             </div>
           </div>
 
-          {/* Botones de acción */}
-          <div className="flex flex-wrap gap-2 pt-2">
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDeleteClick}
-              className="flex-1 min-w-0 sm:min-w-[120px]"
-              disabled={isDeleting}
-            >
-              <Trash2 className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">
-                {isDeleting ? "Eliminando..." : "Eliminar"}
-              </span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsBarcodeModalOpen(true)}
-              className="flex-1 min-w-0 sm:min-w-[120px]"
-            >
-              <Barcode className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Código</span>
-            </Button>
+          {/* Botón principal de venta */}
+          <div className="pt-2">
             <Button
               onClick={() => handleOpenSaleModal(product._id)}
-              className="flex-1 min-w-0 sm:min-w-[120px]"
+              className="w-full bg-green-600 hover:bg-green-700 text-white"
             >
-              <BadgeDollarSign className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Vender</span>
+              <BadgeDollarSign className="h-4 w-4 mr-2" />
+              Vender Producto
             </Button>
           </div>
         </CardContent>

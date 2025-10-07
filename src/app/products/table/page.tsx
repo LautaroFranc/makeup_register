@@ -4,20 +4,15 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ProductTable from "@/components/table/Table";
 import SaleModal from "@/components/SaleModal";
+import ProductFilters from "@/components/ProductFilters";
 import { Pagination } from "@/components/ui/pagination";
 import { useFetch } from "@/hooks/useFetch";
 import { formatToARS, tokenDecode } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-// import {
-//   Select,
-//   SelectContent,
-//   SelectItem,
-//   SelectTrigger,
-//   SelectValue,
-// } from "@/components/ui/select";
-import { Search } from "lucide-react";
+import { Search, RotateCcw } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 interface Product {
   _id: string;
@@ -34,6 +29,7 @@ interface Product {
   code: string;
   barcode: string;
   user: string;
+  published: boolean;
 }
 
 interface SaleProduct {
@@ -56,10 +52,30 @@ interface ProductsResponse {
   };
 }
 
+interface DashboardSummary {
+  totalGananciasEstimada: number;
+  ganancias: number;
+  totalCosto: number;
+  totalStock: number;
+  totalProductos: number;
+  productosPublicados: number;
+  productosOcultos: number;
+  margenPromedio: number;
+  lastUpdated: string;
+}
+
+interface FilterState {
+  search: string;
+  category: string;
+  published: string;
+  stock: string;
+}
+
 export default function ProductDashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [totalSales, setTotalSales] = useState<number>(0);
+  const [dashboardSummary, setDashboardSummary] =
+    useState<DashboardSummary | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [paginationLoading, setPaginationLoading] = useState<boolean>(false);
   const [pagination, setPagination] = useState({
@@ -70,34 +86,45 @@ export default function ProductDashboard() {
     hasPrevPage: false,
     limit: 10,
   });
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [filters, setFilters] = useState<FilterState>({
+    search: "",
+    category: "all",
+    published: "all",
+    stock: "all",
+  });
 
   const {
     data: productsData,
     fetchData: fetchProducts,
     loading,
   } = useFetch<Product[]>();
-  const { data: salesData, fetchData: fetchSales } = useFetch<SaleProduct[]>();
   const {
     data: saleUpdateData,
     fetchData: createSale,
     loading: loadingSale,
   } = useFetch<SaleProduct>();
+  const {
+    data: summaryData,
+    fetchData: fetchSummary,
+    loading: summaryLoading,
+  } = useFetch<{ success: boolean; data: DashboardSummary }>();
   const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+
   // Fetch initial data
   useEffect(() => {
     loadProducts(1);
+    loadDashboardSummary();
+  }, [fetchProducts]);
 
+  const loadDashboardSummary = async () => {
     const token = localStorage.getItem("token");
-    fetchSales(`/api/saleProduct`, {
+    fetchSummary(`/api/dashboard/summary`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
-  }, [fetchProducts, fetchSales]);
+  };
 
   // Update products list and handle sales updates
   useEffect(() => {
@@ -114,6 +141,10 @@ export default function ProductDashboard() {
       }
     }
 
+    if (summaryData && summaryData.success) {
+      setDashboardSummary(summaryData.data);
+    }
+
     if (saleUpdateData) {
       setProducts((prevProducts) =>
         prevProducts.map((product) =>
@@ -127,19 +158,10 @@ export default function ProductDashboard() {
         variant: "default",
       });
       setSelectedProduct(null);
+      // Recargar resumen después de una venta
+      loadDashboardSummary();
     }
-  }, [productsData, saleUpdateData, toast]);
-
-  // Calculate total sales
-  useEffect(() => {
-    if (salesData) {
-      const total = salesData.reduce(
-        (acc, sale) => acc + Number(sale.sellPrice) * sale.stock,
-        0
-      );
-      setTotalSales(total);
-    }
-  }, [salesData]);
+  }, [productsData, summaryData, saleUpdateData, toast]);
 
   const handleDelete = useCallback(
     (id: string) => {
@@ -182,42 +204,76 @@ export default function ProductDashboard() {
     );
   };
 
-  const loadProducts = async (page: number = 1) => {
-    const user = tokenDecode();
-    if (user) {
-      setPaginationLoading(true);
-      try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(
-          `/api/products?slug=${user.slug}&page=${page}&limit=10`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+  const loadProducts = async (
+    page: number = 1,
+    currentFilters: FilterState = filters
+  ) => {
+    setPaginationLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const searchParams = new URLSearchParams({
+        page: page.toString(),
+        limit: "10",
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          setProducts(data.products);
-          setPagination(data.pagination);
-          setCurrentPage(page);
+      // Agregar filtros a los parámetros
+      if (currentFilters.search)
+        searchParams.set("search", currentFilters.search);
+      if (currentFilters.category !== "all")
+        searchParams.set("category", currentFilters.category);
+      if (currentFilters.published !== "all")
+        searchParams.set("published", currentFilters.published);
+      if (currentFilters.stock !== "all")
+        searchParams.set("stock", currentFilters.stock);
+
+      const response = await fetch(`/api/products/private?${searchParams}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProducts(data.products);
+        setPagination(data.pagination);
+        setCurrentPage(page);
+
+        // Actualizar categorías disponibles si vienen en la respuesta
+        if (data.filters?.availableCategories) {
+          setAvailableCategories(data.filters.availableCategories);
         }
-      } catch (error) {
-        console.error("Error loading products:", error);
-      } finally {
-        setPaginationLoading(false);
       }
+    } catch (error) {
+      console.error("Error loading products:", error);
+    } finally {
+      setPaginationLoading(false);
     }
   };
 
   const handleRefresh = () => {
-    loadProducts(1);
+    loadProducts(1, filters);
+    loadDashboardSummary();
   };
 
   const handlePageChange = (page: number) => {
-    loadProducts(page);
+    loadProducts(page, filters);
   };
+
+  const handleFiltersChange = useCallback((newFilters: FilterState) => {
+    setFilters(newFilters);
+    loadProducts(1, newFilters);
+  }, []);
+
+  const handleClearFilters = useCallback(() => {
+    const clearedFilters: FilterState = {
+      search: "",
+      category: "all",
+      published: "all",
+      stock: "all",
+    };
+    setFilters(clearedFilters);
+    loadProducts(1, clearedFilters);
+  }, []);
 
   const handleConfirmSale = (sale: { productId: string; quantity: number }) => {
     const product = products.find((p) => p._id === sale.productId);
@@ -243,55 +299,55 @@ export default function ProductDashboard() {
   //   setCategory(categoryId);
   // };
 
-  const totals = products.reduce(
-    (acc, product) => {
-      const profit = parseFloat(product.sellPrice) * product.stock;
-      const cost = parseFloat(product.buyPrice) * product.stock;
-      return {
-        totalProfit: acc.totalProfit + profit,
-        totalCost: acc.totalCost + cost,
-        totalStock: acc.totalStock + product.stock,
-      };
-    },
-    { totalProfit: 0, totalCost: 0, totalStock: 0 }
-  );
-
   return (
     <div className="p-6 space-y-6">
       <div className="grid gap-4 md:grid-cols-4">
         {[
           {
             title: "Total Ganancias Estimada",
-            value: totals.totalProfit,
+            value: dashboardSummary?.totalGananciasEstimada || 0,
             color: "green-600",
             type: "number",
+            loading: summaryLoading,
           },
           {
             title: "Ganancias",
-            value: totalSales,
+            value: dashboardSummary?.ganancias || 0,
             color: "green-600",
             type: "number",
+            loading: summaryLoading,
           },
           {
             title: "Total Costo",
-            value: totals.totalCost,
+            value: dashboardSummary?.totalCosto || 0,
             color: "red-600",
             type: "number",
+            loading: summaryLoading,
           },
           {
             title: "Total Stock",
-            value: totals.totalStock,
+            value: dashboardSummary?.totalStock || 0,
             color: "black",
             type: "text",
+            loading: summaryLoading,
           },
-        ].map(({ title, value, color, type }) => (
+        ].map(({ title, value, color, type, loading }) => (
           <Card key={title}>
             <CardHeader>
-              <CardTitle>{title}</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                {title}
+                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className={`text-2xl font-bold text-${color}`}>
-                {type === "number" ? formatToARS(value) : value}
+                {loading ? (
+                  <span className="text-gray-400">Cargando...</span>
+                ) : type === "number" ? (
+                  formatToARS(value)
+                ) : (
+                  value
+                )}
               </p>
             </CardContent>
           </Card>
@@ -299,24 +355,31 @@ export default function ProductDashboard() {
       </div>
 
       <div>
-        <div className="flex justify-between">
-          <Card className="relative mb-4">
-            <span className="absolute inset-y-0 left-3 flex items-center text-gray-500">
-              <Search className="h-5 w-5" />
-            </span>
-            <Input
-              type="text"
-              placeholder="Buscar..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-full"
-            />
-          </Card>
+        {/* Filtros */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Filtros de Productos
+            </h2>
+            <Button
+              variant="outline"
+              onClick={handleClearFilters}
+              className="flex items-center gap-2"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Limpiar Filtros
+            </Button>
+          </div>
+          <ProductFilters
+            onFiltersChange={handleFiltersChange}
+            availableCategories={availableCategories}
+            loading={loading}
+          />
         </div>
         <div className="relative">
           <ProductTable
             loading={loading}
-            products={filteredProducts}
+            products={products}
             handleDelete={handleDelete}
             calculateMargin={calculateMargin}
             handleOpenSaleModal={handleOpenSaleModal}
