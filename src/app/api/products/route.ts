@@ -51,14 +51,6 @@ export async function GET(req: NextRequest) {
       user: user._id,
     };
 
-    // Filtro de visibilidad
-    if (published !== null) {
-      query.published = published === "true";
-    } else {
-      // Por defecto, solo productos publicados para usuarios no autenticados
-      query.published = true;
-    }
-
     // Filtro de categoría
     if (category && category !== "all") {
       query.category = category;
@@ -104,7 +96,7 @@ export async function GET(req: NextRequest) {
     // Obtener categorías disponibles para este usuario (para filtros)
     const availableCategories = await Product.distinct("category", {
       user: user._id,
-      published: query.published,
+      published: true,
     });
 
     return NextResponse.json({
