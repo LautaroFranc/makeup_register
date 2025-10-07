@@ -193,7 +193,6 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
       });
 
       // Debug: mostrar todos los datos del FormData
-      console.log("FormData completo:");
       for (let [key, value] of formDataToSend.entries()) {
         console.log(`${key}:`, value);
       }

@@ -55,7 +55,7 @@ export function CategorySelector({
 
   const fetchCategories = async () => {
     const token = localStorage.getItem("token");
-    fetchCategory("api/categories", {
+    fetchCategory("/api/categories", {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -92,7 +92,7 @@ export function CategorySelector({
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("api/categories", {
+      const response = await fetch("/api/categories", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
