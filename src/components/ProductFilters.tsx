@@ -25,6 +25,8 @@ interface FilterState {
   category: string;
   published: string;
   stock: string;
+  minPrice?: string;
+  maxPrice?: string;
 }
 
 const initialFilters: FilterState = {
@@ -32,6 +34,8 @@ const initialFilters: FilterState = {
   category: "all",
   published: "all",
   stock: "all",
+  minPrice: "",
+  maxPrice: "",
 };
 
 export default function ProductFilters({
@@ -47,6 +51,8 @@ export default function ProductFilters({
   useEffect(() => {
     const count = Object.entries(filters).reduce((acc, [key, value]) => {
       if (key === "search") return acc + (value ? 1 : 0);
+      if (key === "minPrice" || key === "maxPrice")
+        return acc + (value ? 1 : 0);
       return acc + (value !== "all" ? 1 : 0);
     }, 0);
     setActiveFiltersCount(count);
@@ -71,7 +77,10 @@ export default function ProductFilters({
   const clearFilter = (key: keyof FilterState) => {
     setFilters((prev) => ({
       ...prev,
-      [key]: key === "search" ? "" : "all",
+      [key]:
+        key === "search" || key === "minPrice" || key === "maxPrice"
+          ? ""
+          : "all",
     }));
   };
 
@@ -241,6 +250,60 @@ export default function ProductFilters({
                 </Button>
               )}
             </div>
+            {/* Rango de precios */}
+            <div className="space-y-2 md:col-span-3">
+              <label className="text-sm font-medium">
+                Rango de precios (ARS)
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Mínimo"
+                    value={filters.minPrice || ""}
+                    onChange={(e) =>
+                      handleFilterChange("minPrice", e.target.value)
+                    }
+                    disabled={loading}
+                  />
+                  {filters.minPrice && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => clearFilter("minPrice")}
+                      className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Máximo"
+                    value={filters.maxPrice || ""}
+                    onChange={(e) =>
+                      handleFilterChange("maxPrice", e.target.value)
+                    }
+                    disabled={loading}
+                  />
+                  {filters.maxPrice && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => clearFilter("maxPrice")}
+                      className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Resumen de filtros activos */}
@@ -272,6 +335,13 @@ export default function ProductFilters({
                       : filters.stock === "low-stock"
                       ? "Stock bajo"
                       : "Sin stock"}
+                  </Badge>
+                )}
+                {(filters.minPrice || filters.maxPrice) && (
+                  <Badge variant="outline" className="text-xs">
+                    Precio: {filters.minPrice ? `≥ ${filters.minPrice}` : ""}
+                    {filters.minPrice && filters.maxPrice ? " y " : ""}
+                    {filters.maxPrice ? `≤ ${filters.maxPrice}` : ""}
                   </Badge>
                 )}
               </div>

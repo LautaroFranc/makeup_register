@@ -29,6 +29,8 @@ export async function GET(req: NextRequest) {
     const published = searchParams.get("published");
     const stockFilter = searchParams.get("stock"); // "in-stock", "low-stock", "out-of-stock"
     const search = searchParams.get("search");
+    const minPrice = searchParams.get("minPrice");
+    const maxPrice = searchParams.get("maxPrice");
 
     if (!slug) {
       return NextResponse.json(
@@ -80,6 +82,22 @@ export async function GET(req: NextRequest) {
       ];
     }
 
+    // Filtro por rango de precios (sellPrice es string)
+    const priceFilters: any[] = [];
+    if (minPrice) {
+      priceFilters.push({
+        $expr: { $gte: [{ $toDouble: "$sellPrice" }, parseFloat(minPrice)] },
+      });
+    }
+    if (maxPrice) {
+      priceFilters.push({
+        $expr: { $lte: [{ $toDouble: "$sellPrice" }, parseFloat(maxPrice)] },
+      });
+    }
+    if (priceFilters.length) {
+      query.$and = [...(query.$and || []), ...priceFilters];
+    }
+
     // Obtener productos con filtros y paginación
     const products = await Product.find(query)
       .sort({ createdAt: -1 })
@@ -117,6 +135,8 @@ export async function GET(req: NextRequest) {
           published,
           stock: stockFilter,
           search,
+          minPrice,
+          maxPrice,
         },
       },
     });

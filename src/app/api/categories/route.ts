@@ -9,7 +9,6 @@ connectDB();
 // GET - Obtener todas las categorías del usuario
 export async function GET(req: NextRequest) {
   try {
-    console.log("GET - Obtener todas las categorías del usuario");
     const authCheck = await authMiddleware(req);
     if (authCheck.status !== 200) return authCheck;
     const { _id } = (await authCheck.json()).user;

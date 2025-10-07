@@ -69,6 +69,8 @@ interface FilterState {
   category: string;
   published: string;
   stock: string;
+  minPrice?: string;
+  maxPrice?: string;
 }
 
 export default function ProductDashboard() {
@@ -92,6 +94,8 @@ export default function ProductDashboard() {
     category: "all",
     published: "all",
     stock: "all",
+    minPrice: "",
+    maxPrice: "",
   });
 
   const {
@@ -225,6 +229,10 @@ export default function ProductDashboard() {
         searchParams.set("published", currentFilters.published);
       if (currentFilters.stock !== "all")
         searchParams.set("stock", currentFilters.stock);
+      if (currentFilters.minPrice)
+        searchParams.set("minPrice", currentFilters.minPrice);
+      if (currentFilters.maxPrice)
+        searchParams.set("maxPrice", currentFilters.maxPrice);
 
       const response = await fetch(`/api/products/private?${searchParams}`, {
         headers: {
