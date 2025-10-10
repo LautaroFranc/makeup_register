@@ -13,7 +13,8 @@ export interface IProduct extends Document {
   stock: number;
   code: string;
   barcode: string; // Código de barras EAN-13/EAN-8
-  user: string;
+  user: string; // Usuario propietario
+  store: string; // Tienda a la que pertenece el producto
   category: string;
   published: boolean; // Control de visibilidad pública
 }
@@ -66,6 +67,11 @@ const ProductSchema: Schema<IProduct> = new Schema(
     user: {
       type: String,
       required: true,
+    },
+    store: {
+      type: String,
+      required: true,
+      ref: "Store",
     },
     published: {
       type: Boolean,

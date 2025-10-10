@@ -10,6 +10,7 @@ import {
   LogOut,
   Settings,
   Tags,
+  Store,
 } from "lucide-react";
 
 import {
@@ -56,7 +57,11 @@ const items = [
       },
     ],
   },
-
+  {
+    title: "Tiendas",
+    url: "/stores",
+    icon: Store,
+  },
   {
     title: "Configuración",
     url: "/settings",

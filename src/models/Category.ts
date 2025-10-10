@@ -6,6 +6,7 @@ export interface ICategory extends Document {
   color?: string; // Color para identificar la categoría visualmente
   icon?: string; // Icono para la categoría
   user: string; // Referencia al usuario propietario
+  store: string; // Referencia a la tienda
   isActive: boolean; // Si la categoría está activa
   productCount: number; // Contador de productos en esta categoría
 }
@@ -34,6 +35,11 @@ const CategorySchema: Schema<ICategory> = new Schema(
       required: true,
       ref: "Users",
     },
+    store: {
+      type: String,
+      required: true,
+      ref: "Store",
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -48,7 +54,8 @@ const CategorySchema: Schema<ICategory> = new Schema(
 
 // Índices para optimizar consultas
 CategorySchema.index({ user: 1, isActive: 1 });
-CategorySchema.index({ user: 1, name: 1 }, { unique: true }); // Nombre único por usuario
+CategorySchema.index({ store: 1, isActive: 1 });
+CategorySchema.index({ user: 1, store: 1, name: 1 }, { unique: true }); // Nombre único por usuario
 
 const Category: Model<ICategory> =
   mongoose.models.Category ||
