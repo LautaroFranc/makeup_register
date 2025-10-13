@@ -3,6 +3,7 @@ import Product from "@/models/Product"; // Asegúrate de que esta ruta sea corre
 import connectDB from "@/config/db"; // Ruta de conexión a la base de datos
 import cloudinary from "@/config/cloudinary";
 import { authMiddleware } from "../middleware";
+import Store from "@/models/Store";
 import Users from "@/models/Users";
 import { generateArgentineBarcode } from "@/lib/barcodeUtils";
 
@@ -206,6 +207,38 @@ export async function POST(req: NextRequest) {
     const newProductCode = await generateUniqueProductCode();
     const barcode = generateArgentineBarcode("EAN13");
 
+    // Resolver tienda destino
+    let targetStoreId = (productData.storeId || productData.store) as
+      | string
+      | undefined;
+
+    if (targetStoreId) {
+      // Validar que la tienda pertenezca al usuario
+      const store = await Store.findOne({ _id: targetStoreId, user: userId });
+      if (!store) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "La tienda especificada no existe o no pertenece al usuario",
+          },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Tomar la primera tienda activa del usuario
+      const store = await Store.findOne({ user: userId, isActive: true });
+      if (!store) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "No se encontró una tienda activa para el usuario",
+          },
+          { status: 400 }
+        );
+      }
+      targetStoreId = store._id.toString();
+    }
+
     const newProduct = await Product.create({
       ...productData,
       image: uploadedImage?.secure_url || null,
@@ -214,6 +247,8 @@ export async function POST(req: NextRequest) {
       code: newProductCode,
       barcode: barcode,
       user: userId,
+      store: targetStoreId,
+      stock: productData.stock ? parseInt(productData.stock as string) : 0,
     });
 
     return NextResponse.json(

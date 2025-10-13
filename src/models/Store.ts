@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 import slugify from "slugify";
 
 export interface IStore extends Document {
+  _id: string;
   name: string;
   description?: string;
   slug: string; // URL única para la tienda

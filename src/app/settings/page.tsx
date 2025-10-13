@@ -965,38 +965,6 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />
-                Herramientas Avanzadas
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 border rounded">
-                  <h4 className="font-medium">Migración de Datos</h4>
-                  <p className="text-sm text-gray-500 mb-3">
-                    Herramientas para migrar y sincronizar datos entre tiendas
-                  </p>
-                  <Button variant="outline" size="sm">
-                    Ejecutar Migración
-                  </Button>
-                </div>
-                <div className="p-4 border rounded">
-                  <h4 className="font-medium">Respaldo y Restauración</h4>
-                  <p className="text-sm text-gray-500 mb-3">
-                    Crea respaldos de tus datos y restaura desde copias de
-                    seguridad
-                  </p>
-                  <Button variant="outline" size="sm">
-                    Gestionar Respaldos
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* Tab de Página - Personalización Estética */}
