@@ -55,7 +55,7 @@ export function CategorySelector({
 
   const fetchCategories = async () => {
     const token = localStorage.getItem("token");
-    fetchCategory("api/categories", {
+    fetchCategory("/api/categories", {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -63,7 +63,6 @@ export function CategorySelector({
     });
   };
   useEffect(() => {
-    console.log(categoryData);
     if (categoryData) {
       // Manejar tanto la respuesta antigua (array) como la nueva (objeto con categories)
       if (Array.isArray(categoryData)) {
