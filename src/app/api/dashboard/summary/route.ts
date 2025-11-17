@@ -3,6 +3,7 @@ import Product from "@/models/Product";
 import SaleProduct from "@/models/SaleProduct";
 import connectDB from "@/config/db";
 import { authMiddleware } from "../../middleware";
+import { Product as ProductIterface } from "@/interface/product";
 
 connectDB();
 
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
     const userId = (await authCheck.json()).user._id;
 
     // Obtener todos los productos del usuario
-    const products = await Product.find({ user: userId });
+    const products: ProductIterface[] = await Product.find({ user: userId });
 
     // Calcular totales de inventario actual
     const productTotals = products.reduce(
@@ -47,7 +48,9 @@ export async function GET(req: NextRequest) {
 
     // Calcular costo de productos vendidos
     const costoProductosVendidos = sales.reduce((acc, sale) => {
-      const product = products.find((p) => p._id.toString() === sale.idProduct.toString());
+      const product = products.find(
+        (p) => p._id.toString() === sale.idProduct.toString()
+      );
       if (product) {
         const buyPrice = parseFloat(product.buyPrice);
         return acc + buyPrice * sale.stock;
@@ -59,9 +62,8 @@ export async function GET(req: NextRequest) {
     const gananciaNeta = ingresosPorVentas - costoProductosVendidos;
 
     // Calcular margen de ganancia real (%)
-    const margenGananciaReal = ingresosPorVentas > 0
-      ? (gananciaNeta / ingresosPorVentas) * 100
-      : 0;
+    const margenGananciaReal =
+      ingresosPorVentas > 0 ? (gananciaNeta / ingresosPorVentas) * 100 : 0;
 
     // Calcular estadísticas de catálogo
     const totalProductos = products.length;
@@ -70,7 +72,9 @@ export async function GET(req: NextRequest) {
 
     // Calcular estadísticas de stock
     const productosSinStock = products.filter((p) => p.stock === 0).length;
-    const productosStockBajo = products.filter((p) => p.stock > 0 && p.stock < 5).length;
+    const productosStockBajo = products.filter(
+      (p) => p.stock > 0 && p.stock < 5
+    ).length;
 
     // Calcular margen promedio de inventario
     const productosConMargen = products.filter(
@@ -100,7 +104,8 @@ export async function GET(req: NextRequest) {
 
         // Métricas de inventario
         totalStock: productTotals.totalStock,
-        margenPromedioInventario: Math.round(margenPromedioInventario * 100) / 100,
+        margenPromedioInventario:
+          Math.round(margenPromedioInventario * 100) / 100,
 
         // Estadísticas de catálogo
         totalProductos,

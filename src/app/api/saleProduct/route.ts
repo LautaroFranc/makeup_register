@@ -12,12 +12,14 @@ export async function GET(req: NextRequest) {
     if (authCheck.status !== 200) return authCheck;
 
     const userId = (await authCheck.json()).user._id;
-    const saleProduct = await SaleProduct.find({ user: userId }).sort({ createdAt: -1 });
+    const saleProduct = await SaleProduct.find({ user: userId }).sort({
+      createdAt: -1,
+    });
 
     return NextResponse.json({
       success: true,
       sales: saleProduct,
-      total: saleProduct.length
+      total: saleProduct.length,
     });
   } catch (error: any) {
     console.error("Error al obtener ventas:", error);
@@ -25,7 +27,7 @@ export async function GET(req: NextRequest) {
       {
         success: false,
         message: "Error al obtener las ventas. Por favor intenta nuevamente.",
-        details: error.message
+        details: error.message,
       },
       { status: 500 }
     );
@@ -39,13 +41,9 @@ export async function POST(req: NextRequest) {
     let body = await req.json();
 
     // Si body es un string, parsearlo manualmente
-    if (typeof body === 'string') {
-      console.log("Body es string, parseando manualmente...");
+    if (typeof body === "string") {
       body = JSON.parse(body);
     }
-
-    console.log("Body parseado:", body);
-    console.log("Tipo de body:", typeof body);
 
     // Luego autenticamos
     const authCheck = await authMiddleware(req);
@@ -58,8 +56,6 @@ export async function POST(req: NextRequest) {
     const productId = body.productId || body.idProduct;
     const quantity = body.quantity || body.stock;
     const sellPrice = body.sellPrice;
-
-    console.log("Datos extraídos - productId:", productId, "quantity:", quantity, "sellPrice:", sellPrice);
 
     // Validar datos requeridos
     if (!productId) {
@@ -84,7 +80,7 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           message: "Producto no encontrado. Verifica que el ID sea correcto.",
-          details: `ID buscado: ${productId}`
+          details: `ID buscado: ${productId}`,
         },
         { status: 404 }
       );
@@ -95,7 +91,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "No tienes permiso para vender este producto. El producto pertenece a otro usuario."
+          message:
+            "No tienes permiso para vender este producto. El producto pertenece a otro usuario.",
         },
         { status: 403 }
       );
@@ -126,13 +123,16 @@ export async function POST(req: NextRequest) {
       user: userId,
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Venta registrada exitosamente",
-      sale: newSaleProduct,
-      productName: product.name,
-      stockRestante: product.stock
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Venta registrada exitosamente",
+        sale: newSaleProduct,
+        productName: product.name,
+        stockRestante: product.stock,
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     console.error("Error al registrar venta:", error);
 
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "ID de producto inválido. El formato del ID no es correcto."
+          message: "ID de producto inválido. El formato del ID no es correcto.",
         },
         { status: 400 }
       );
@@ -149,11 +149,13 @@ export async function POST(req: NextRequest) {
 
     // Manejar errores de validación de Mongoose
     if (error.name === "ValidationError") {
-      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
+      const validationErrors = Object.values(error.errors).map(
+        (err: any) => err.message
+      );
       return NextResponse.json(
         {
           success: false,
-          message: "Error de validación: " + validationErrors.join(", ")
+          message: "Error de validación: " + validationErrors.join(", "),
         },
         { status: 400 }
       );
@@ -163,7 +165,7 @@ export async function POST(req: NextRequest) {
       {
         success: false,
         message: "Error al registrar la venta. Por favor intenta nuevamente.",
-        details: error.message
+        details: error.message,
       },
       { status: 500 }
     );
