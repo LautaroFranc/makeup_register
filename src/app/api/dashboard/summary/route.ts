@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     // Obtener todos los productos del usuario
     const products = await Product.find({ user: userId });
 
-    // Calcular totales de productos
+    // Calcular totales de inventario actual
     const productTotals = products.reduce(
       (acc, product) => {
         const sellPrice = parseFloat(product.sellPrice);
@@ -24,15 +24,14 @@ export async function GET(req: NextRequest) {
         const stock = product.stock;
 
         return {
-          totalGananciasEstimada:
-            acc.totalGananciasEstimada + sellPrice * stock,
-          totalCosto: acc.totalCosto + buyPrice * stock,
+          valorInventario: acc.valorInventario + sellPrice * stock,
+          costoInventario: acc.costoInventario + buyPrice * stock,
           totalStock: acc.totalStock + stock,
         };
       },
       {
-        totalGananciasEstimada: 0,
-        totalCosto: 0,
+        valorInventario: 0,
+        costoInventario: 0,
         totalStock: 0,
       }
     );
@@ -40,23 +39,45 @@ export async function GET(req: NextRequest) {
     // Obtener todas las ventas del usuario
     const sales = await SaleProduct.find({ user: userId });
 
-    // Calcular ganancias reales (ventas realizadas)
-    const gananciasReales = sales.reduce(
+    // Calcular ingresos por ventas (ventas realizadas)
+    const ingresosPorVentas = sales.reduce(
       (acc, sale) => acc + Number(sale.sellPrice) * sale.stock,
       0
     );
 
-    // Calcular estadísticas adicionales
+    // Calcular costo de productos vendidos
+    const costoProductosVendidos = sales.reduce((acc, sale) => {
+      const product = products.find((p) => p._id.toString() === sale.idProduct.toString());
+      if (product) {
+        const buyPrice = parseFloat(product.buyPrice);
+        return acc + buyPrice * sale.stock;
+      }
+      return acc;
+    }, 0);
+
+    // Calcular ganancia neta real
+    const gananciaNeta = ingresosPorVentas - costoProductosVendidos;
+
+    // Calcular margen de ganancia real (%)
+    const margenGananciaReal = ingresosPorVentas > 0
+      ? (gananciaNeta / ingresosPorVentas) * 100
+      : 0;
+
+    // Calcular estadísticas de catálogo
     const totalProductos = products.length;
     const productosPublicados = products.filter((p) => p.published).length;
     const productosOcultos = totalProductos - productosPublicados;
 
-    // Calcular margen promedio
+    // Calcular estadísticas de stock
+    const productosSinStock = products.filter((p) => p.stock === 0).length;
+    const productosStockBajo = products.filter((p) => p.stock > 0 && p.stock < 5).length;
+
+    // Calcular margen promedio de inventario
     const productosConMargen = products.filter(
       (p) => parseFloat(p.buyPrice) > 0 && parseFloat(p.sellPrice) > 0
     );
 
-    const margenPromedio =
+    const margenPromedioInventario =
       productosConMargen.length > 0
         ? productosConMargen.reduce((acc, product) => {
             const buyPrice = parseFloat(product.buyPrice);
@@ -69,17 +90,26 @@ export async function GET(req: NextRequest) {
     const response = {
       success: true,
       data: {
-        // Datos principales del dashboard
-        totalGananciasEstimada: productTotals.totalGananciasEstimada,
-        ganancias: gananciasReales,
-        totalCosto: productTotals.totalCosto,
-        totalStock: productTotals.totalStock,
+        // Métricas financieras principales
+        valorInventario: productTotals.valorInventario,
+        costoInventario: productTotals.costoInventario,
+        ingresosPorVentas: ingresosPorVentas,
+        costoProductosVendidos: costoProductosVendidos,
+        gananciaNeta: gananciaNeta,
+        margenGananciaReal: Math.round(margenGananciaReal * 100) / 100,
 
-        // Estadísticas adicionales
+        // Métricas de inventario
+        totalStock: productTotals.totalStock,
+        margenPromedioInventario: Math.round(margenPromedioInventario * 100) / 100,
+
+        // Estadísticas de catálogo
         totalProductos,
         productosPublicados,
         productosOcultos,
-        margenPromedio: Math.round(margenPromedio * 100) / 100,
+
+        // Alertas de stock
+        productosSinStock,
+        productosStockBajo,
 
         // Fecha de actualización
         lastUpdated: new Date().toISOString(),

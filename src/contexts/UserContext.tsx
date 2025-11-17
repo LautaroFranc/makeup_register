@@ -11,11 +11,14 @@ import React, {
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
+export type UserRole = "admin" | "manager" | "employee";
+
 interface User {
   _id: string;
   name: string;
   email: string;
   slug: string;
+  role: UserRole; // 👈 Agregar rol al usuario
 }
 
 interface UserContextType {
@@ -25,6 +28,10 @@ interface UserContextType {
   login: (token: string) => void;
   logout: () => void;
   refreshUser: () => void;
+  hasRole: (roles: UserRole[]) => boolean; // 👈 Helper para verificar roles
+  isAdmin: () => boolean; // 👈 Helper para verificar si es admin
+  isManager: () => boolean; // 👈 Helper para verificar si es manager
+  isEmployee: () => boolean; // 👈 Helper para verificar si es empleado
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -109,6 +116,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     fetchUserData();
   };
 
+  // 👇 Funciones helper para verificar roles
+  const hasRole = (roles: UserRole[]) => {
+    if (!user) return false;
+    return roles.includes(user.role);
+  };
+
+  const isAdmin = () => hasRole(["admin"]);
+  const isManager = () => hasRole(["manager"]);
+  const isEmployee = () => hasRole(["employee"]);
+
   useEffect(() => {
     // Solo cargar datos si no se ha inicializado aún
     if (!initialized) {
@@ -125,6 +142,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       login,
       logout,
       refreshUser,
+      hasRole,
+      isAdmin,
+      isManager,
+      isEmployee,
     }),
     [user, loading, error]
   );

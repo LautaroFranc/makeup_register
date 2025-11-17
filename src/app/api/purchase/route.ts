@@ -27,16 +27,27 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Mapear los datos de las ventas con la imagen del producto
+    // Mapear los datos de las ventas con las imágenes del producto
     const result = await Promise.all(
       sales.map(async (sale: any) => {
         const product = await Product.findOne({
           _id: sale.idProduct,
           user: userId,
         });
+
+        // Combinar todas las imágenes disponibles del producto
+        const allImages = [];
+        if (product?.image) {
+          allImages.push(product.image);
+        }
+        if (product?.images && product.images.length > 0) {
+          allImages.push(...product.images);
+        }
+
         return {
           idProduct: sale.idProduct,
-          image: product?.image || "/placeholder.jpg",
+          image: allImages.length > 0 ? allImages[0] : "/placeholder.jpg", // Imagen principal
+          images: allImages, // Todas las imágenes
           name: product?.name,
           totalPrice: Number(sale.sellPrice) * sale.stock,
           totalStockSold: sale.stock,

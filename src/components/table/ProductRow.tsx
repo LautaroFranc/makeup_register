@@ -75,6 +75,7 @@ const ProductRow: React.FC<ProductRowProps> = ({
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
   const [localImages, setLocalImages] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const { toast } = useToast();
@@ -206,6 +207,7 @@ const ProductRow: React.FC<ProductRowProps> = ({
 
   const handleToggleVisibility = useCallback(
     async (published: boolean) => {
+      setIsTogglingVisibility(true);
       try {
         const token = localStorage.getItem("token");
         const response = await fetch(`/api/products/${product._id}`, {
@@ -226,25 +228,26 @@ const ProductRow: React.FC<ProductRowProps> = ({
           }
 
           toast({
-            description: `Producto ${
-              published ? "publicado" : "oculto"
-            } exitosamente`,
+            title: published ? "Producto publicado" : "Producto oculto",
+            description: `El producto ahora está ${published ? "visible" : "oculto"} en la tienda pública`,
             variant: "default",
           });
         } else {
           toast({
-            description: `Error al ${
-              published ? "publicar" : "ocultar"
-            } el producto`,
+            title: "Error",
+            description: result.error || `Error al ${published ? "publicar" : "ocultar"} el producto`,
             variant: "destructive",
           });
         }
       } catch (error) {
         console.error("Error al cambiar visibilidad:", error);
         toast({
-          description: "Error de conexión",
+          title: "Error de conexión",
+          description: "No se pudo cambiar la visibilidad del producto",
           variant: "destructive",
         });
+      } finally {
+        setIsTogglingVisibility(false);
       }
     },
     [product._id, product, onProductUpdate, toast]
@@ -443,10 +446,11 @@ const ProductRow: React.FC<ProductRowProps> = ({
             <Switch
               checked={product.published}
               onCheckedChange={handleToggleVisibility}
-              className="data-[state=checked]:bg-green-600"
+              disabled={isTogglingVisibility}
+              className="data-[state=checked]:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <span className="text-xs text-gray-500 min-w-[60px]">
-              {product.published ? "Visible" : "Oculto"}
+              {isTogglingVisibility ? "..." : (product.published ? "Visible" : "Oculto")}
             </span>
           </div>
 

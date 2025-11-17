@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       userId: user._id,
       email: user.email,
       slug: user.slug,
+      role: user.role, // 👈 Incluir rol en el token
     };
 
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || "");

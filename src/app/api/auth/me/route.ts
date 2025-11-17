@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
       name: user.name,
       email: user.email,
       slug: user.slug,
+      role: user.role, // 👈 Incluir rol en la respuesta
     });
   } catch (error: any) {
     if (error.name === "JsonWebTokenError") {
@@ -153,6 +154,7 @@ export async function PUT(req: NextRequest) {
         name: updatedUser.name,
         email: updatedUser.email,
         slug: updatedUser.slug,
+        role: updatedUser.role, // 👈 Incluir rol en la respuesta
       },
     });
   } catch (error: any) {

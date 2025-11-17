@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/config/db";
 import Store from "@/models/Store";
 import { authMiddleware } from "../middleware";
+import slugify from "slugify";
 
 connectDB();
 
@@ -38,7 +39,11 @@ export async function GET(req: NextRequest) {
   } catch (error: any) {
     console.error("Error fetching stores:", error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: "Error al obtener las tiendas. Por favor intenta nuevamente.",
+        details: error.message
+      },
       { status: 500 }
     );
   }
@@ -70,6 +75,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Generar slug único
+    let baseSlug = slugify(name.trim(), { lower: true, strict: true });
+    let slug = baseSlug;
+    let counter = 1;
+
+    // Verificar que el slug sea único
+    while (await Store.findOne({ slug })) {
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+
     // Verificar que no exista otra tienda con el mismo nombre para este usuario
     const existingStore = await Store.findOne({
       user: _id,
@@ -86,6 +102,7 @@ export async function POST(req: NextRequest) {
     // Crear la tienda
     const store = new Store({
       name: name.trim(),
+      slug,
       description: description?.trim(),
       user: _id,
       isActive,
@@ -122,6 +139,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      message: "Tienda creada exitosamente",
       store: {
         _id: store._id,
         name: store.name,
@@ -137,8 +155,36 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error creating store:", error);
+
+    // Manejar errores de validación de Mongoose
+    if (error.name === "ValidationError") {
+      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Error de validación: " + validationErrors.join(", ")
+        },
+        { status: 400 }
+      );
+    }
+
+    // Manejar error de clave duplicada
+    if (error.code === 11000) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Ya existe una tienda con ese nombre o slug"
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: "Error al crear la tienda. Por favor intenta nuevamente.",
+        details: error.message
+      },
       { status: 500 }
     );
   }
@@ -156,7 +202,7 @@ export async function PUT(req: NextRequest) {
 
     if (!storeId) {
       return NextResponse.json(
-        { success: false, error: "ID de tienda requerido" },
+        { success: false, error: "El ID de la tienda es requerido" },
         { status: 400 }
       );
     }
@@ -206,12 +252,52 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      message: "Tienda actualizada exitosamente",
       store: updatedStore,
     });
   } catch (error: any) {
     console.error("Error updating store:", error);
+
+    // Manejar errores de validación de Mongoose
+    if (error.name === "ValidationError") {
+      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Error de validación: " + validationErrors.join(", ")
+        },
+        { status: 400 }
+      );
+    }
+
+    // Manejar error de clave duplicada
+    if (error.code === 11000) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Ya existe una tienda con ese nombre"
+        },
+        { status: 400 }
+      );
+    }
+
+    // Manejar error de ID inválido
+    if (error.name === "CastError") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "ID de tienda inválido"
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: "Error al actualizar la tienda. Por favor intenta nuevamente.",
+        details: error.message
+      },
       { status: 500 }
     );
   }
@@ -229,7 +315,7 @@ export async function DELETE(req: NextRequest) {
 
     if (!storeId) {
       return NextResponse.json(
-        { success: false, error: "ID de tienda requerido" },
+        { success: false, error: "El ID de la tienda es requerido" },
         { status: 400 }
       );
     }
@@ -238,7 +324,7 @@ export async function DELETE(req: NextRequest) {
     const store = await Store.findOne({ _id: storeId, user: _id });
     if (!store) {
       return NextResponse.json(
-        { success: false, error: "Tienda no encontrada" },
+        { success: false, error: "Tienda no encontrada o no autorizada" },
         { status: 404 }
       );
     }
@@ -265,8 +351,24 @@ export async function DELETE(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error deleting store:", error);
+
+    // Manejar error de ID inválido
+    if (error.name === "CastError") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "ID de tienda inválido"
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: "Error al eliminar la tienda. Por favor intenta nuevamente.",
+        details: error.message
+      },
       { status: 500 }
     );
   }

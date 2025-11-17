@@ -91,7 +91,7 @@ export function CategorySelector({
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("api/categories", {
+      const response = await fetch("/api/categories", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -118,13 +118,13 @@ export function CategorySelector({
           variant: "default",
         });
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error || "Error desconocido al crear categoría");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating category:", error);
       toast({
-        title: "Error",
-        description: `No se pudo crear la categoría: ${error}`,
+        title: "Error al crear categoría",
+        description: error?.message || "No se pudo crear la categoría. Por favor intenta nuevamente.",
         variant: "destructive",
       });
     }

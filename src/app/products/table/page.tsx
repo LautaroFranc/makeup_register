@@ -53,14 +53,23 @@ interface ProductsResponse {
 }
 
 interface DashboardSummary {
-  totalGananciasEstimada: number;
-  ganancias: number;
-  totalCosto: number;
+  // Métricas financieras principales
+  valorInventario: number;
+  costoInventario: number;
+  ingresosPorVentas: number;
+  costoProductosVendidos: number;
+  gananciaNeta: number;
+  margenGananciaReal: number;
+  // Métricas de inventario
   totalStock: number;
+  margenPromedioInventario: number;
+  // Estadísticas de catálogo
   totalProductos: number;
   productosPublicados: number;
   productosOcultos: number;
-  margenPromedio: number;
+  // Alertas de stock
+  productosSinStock: number;
+  productosStockBajo: number;
   lastUpdated: string;
 }
 
@@ -130,7 +139,7 @@ export default function ProductDashboard() {
     });
   };
 
-  // Update products list and handle sales updates
+  // Update products list
   useEffect(() => {
     if (productsData) {
       // Si productsData es un array (respuesta antigua), usar directamente
@@ -144,12 +153,19 @@ export default function ProductDashboard() {
         setPagination(response.pagination);
       }
     }
+  }, [productsData]);
 
+  // Update dashboard summary
+  useEffect(() => {
     if (summaryData && summaryData.success) {
       setDashboardSummary(summaryData.data);
     }
+  }, [summaryData]);
 
+  // Handle sale updates - SEPARADO para evitar ciclo infinito
+  useEffect(() => {
     if (saleUpdateData) {
+      // Actualizar stock localmente para feedback inmediato
       setProducts((prevProducts) =>
         prevProducts.map((product) =>
           product._id === saleUpdateData.idProduct
@@ -158,14 +174,21 @@ export default function ProductDashboard() {
         )
       );
       toast({
-        description: "Producto actualizado exitosamente!",
+        title: "Venta registrada",
+        description: "El stock del producto ha sido actualizado exitosamente",
         variant: "default",
       });
       setSelectedProduct(null);
+
+      // Recargar productos desde el servidor para asegurar sincronización
+      setTimeout(() => {
+        loadProducts(currentPage, filters);
+      }, 500);
+
       // Recargar resumen después de una venta
       loadDashboardSummary();
     }
-  }, [productsData, summaryData, saleUpdateData, toast]);
+  }, [saleUpdateData, toast]);
 
   const handleDelete = useCallback(
     (id: string) => {
@@ -298,6 +321,7 @@ export default function ProductDashboard() {
       method: "POST",
       body: JSON.stringify(saleData),
       headers: {
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
     });
@@ -309,58 +333,117 @@ export default function ProductDashboard() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="grid gap-4 md:grid-cols-4">
-        {[
-          {
-            title: "Total Ganancias Estimada",
-            value: dashboardSummary?.totalGananciasEstimada || 0,
-            color: "green-600",
-            type: "number",
-            loading: summaryLoading,
-          },
-          {
-            title: "Ganancias",
-            value: dashboardSummary?.ganancias || 0,
-            color: "green-600",
-            type: "number",
-            loading: summaryLoading,
-          },
-          {
-            title: "Total Costo",
-            value: dashboardSummary?.totalCosto || 0,
-            color: "red-600",
-            type: "number",
-            loading: summaryLoading,
-          },
-          {
-            title: "Total Stock",
-            value: dashboardSummary?.totalStock || 0,
-            color: "black",
-            type: "text",
-            loading: summaryLoading,
-          },
-        ].map(({ title, value, color, type, loading }) => (
-          <Card key={title}>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                {title}
-                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className={`text-2xl font-bold text-${color}`}>
-                {loading ? (
-                  <span className="text-gray-400">Cargando...</span>
-                ) : type === "number" ? (
-                  formatToARS(value)
-                ) : (
-                  value
+      {/* Card única con todas las métricas */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            Resumen del Negocio
+            {summaryLoading && <Loader2 className="h-5 w-5 animate-spin text-blue-500" />}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Métricas Financieras */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
+              Métricas Financieras
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500">Valor Inventario</p>
+                <p className="text-xl font-bold text-blue-600">
+                  {summaryLoading ? "..." : formatToARS(dashboardSummary?.valorInventario || 0)}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500">Ganancia Neta</p>
+                <p className="text-xl font-bold text-green-600">
+                  {summaryLoading ? "..." : formatToARS(dashboardSummary?.gananciaNeta || 0)}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500">Ingresos Ventas</p>
+                <p className="text-xl font-bold text-emerald-600">
+                  {summaryLoading ? "..." : formatToARS(dashboardSummary?.ingresosPorVentas || 0)}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500">Margen Real</p>
+                <p className="text-xl font-bold text-purple-600">
+                  {summaryLoading ? "..." : `${(dashboardSummary?.margenGananciaReal || 0).toFixed(1)}%`}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
+              Inventario y Catálogo
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500">Total Stock</p>
+                <p className="text-xl font-bold text-gray-700">
+                  {summaryLoading ? "..." : dashboardSummary?.totalStock || 0}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500">Total Productos</p>
+                <p className="text-xl font-bold text-gray-700">
+                  {summaryLoading ? "..." : dashboardSummary?.totalProductos || 0}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500">Publicados</p>
+                <p className="text-xl font-bold text-green-600">
+                  {summaryLoading ? "..." : dashboardSummary?.productosPublicados || 0}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500">Ocultos</p>
+                <p className="text-xl font-bold text-gray-500">
+                  {summaryLoading ? "..." : dashboardSummary?.productosOcultos || 0}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Alertas de Stock */}
+          {!summaryLoading && (
+            (dashboardSummary?.productosSinStock || 0) > 0 ||
+            (dashboardSummary?.productosStockBajo || 0) > 0
+          ) && (
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide flex items-center gap-2">
+                <span className="text-red-500">⚠️</span> Alertas de Stock
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {(dashboardSummary?.productosSinStock || 0) > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div>
+                      <p className="text-xs text-gray-600">Productos sin stock</p>
+                      <p className="text-lg font-bold text-red-600">
+                        {dashboardSummary?.productosSinStock}
+                      </p>
+                    </div>
+                    <div className="text-2xl">🔴</div>
+                  </div>
                 )}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                {(dashboardSummary?.productosStockBajo || 0) > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div>
+                      <p className="text-xs text-gray-600">Stock bajo (&lt;5 unidades)</p>
+                      <p className="text-lg font-bold text-yellow-600">
+                        {dashboardSummary?.productosStockBajo}
+                      </p>
+                    </div>
+                    <div className="text-2xl">⚠️</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div>
         {/* Filtros */}

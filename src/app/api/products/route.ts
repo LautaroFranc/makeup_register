@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 
     if (!slug) {
       return NextResponse.json(
-        { success: false, error: "Slug requerido" },
+        { success: false, error: "El slug del usuario es requerido" },
         { status: 400 }
       );
     }
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { success: false, error: "Usuario no encontrado" },
+        { success: false, error: "Usuario no encontrado con ese slug" },
         { status: 404 }
       );
     }
@@ -142,8 +142,13 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error: any) {
+    console.error("Error al obtener productos:", error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: "Error al obtener los productos. Por favor intenta nuevamente.",
+        details: error.message
+      },
       { status: 500 }
     );
   }
@@ -167,7 +172,7 @@ export async function POST(req: NextRequest) {
     if (imageFile) {
       if (imageFile.size > 5 * 1024 * 1024) {
         return NextResponse.json(
-          { success: false, error: "Image size exceeds 5 MB" },
+          { success: false, error: "El tamaño de la imagen excede los 5 MB" },
           { status: 400 }
         );
       }
@@ -187,7 +192,7 @@ export async function POST(req: NextRequest) {
       if (imgFile && imgFile.size > 0) {
         if (imgFile.size > 5 * 1024 * 1024) {
           return NextResponse.json(
-            { success: false, error: "Image size exceeds 5 MB" },
+            { success: false, error: "Una o más imágenes exceden el tamaño máximo de 5 MB" },
             { status: 400 }
           );
         }
@@ -252,12 +257,45 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(
-      { success: true, data: newProduct },
+      {
+        success: true,
+        data: newProduct,
+        message: "Producto creado exitosamente"
+      },
       { status: 201 }
     );
   } catch (error: any) {
+    console.error("Error al crear producto:", error);
+
+    // Manejar errores de validación de Mongoose
+    if (error.name === "ValidationError") {
+      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Error de validación: " + validationErrors.join(", ")
+        },
+        { status: 400 }
+      );
+    }
+
+    // Manejar error de clave duplicada
+    if (error.code === 11000) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Ya existe un producto con ese código de barras o código único"
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: "Error al crear el producto. Por favor intenta nuevamente.",
+        details: error.message
+      },
       { status: 500 }
     );
   }
@@ -275,7 +313,7 @@ export async function DELETE(req: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        { success: false, error: "ID is required" },
+        { success: false, error: "El ID del producto es requerido" },
         { status: 400 }
       );
     }
@@ -287,15 +325,36 @@ export async function DELETE(req: NextRequest) {
 
     if (!deletedProduct) {
       return NextResponse.json(
-        { success: false, error: "Product not found or unauthorized" },
+        { success: false, error: "Producto no encontrado o no autorizado" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ success: true, data: deletedProduct });
+    return NextResponse.json({
+      success: true,
+      data: deletedProduct,
+      message: "Producto eliminado exitosamente"
+    });
   } catch (error: any) {
+    console.error("Error al eliminar producto:", error);
+
+    // Manejar error de ID inválido
+    if (error.name === "CastError") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "ID de producto inválido"
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: "Error al eliminar el producto. Por favor intenta nuevamente.",
+        details: error.message
+      },
       { status: 500 }
     );
   }
@@ -312,7 +371,7 @@ export async function PUT(req: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        { success: false, error: "ID is required" },
+        { success: false, error: "El ID del producto es requerido" },
         { status: 400 }
       );
     }
@@ -331,7 +390,7 @@ export async function PUT(req: NextRequest) {
     if (mainImageFile && mainImageFile.size > 0) {
       if (mainImageFile.size > 5 * 1024 * 1024) {
         return NextResponse.json(
-          { success: false, error: "Main image size exceeds 5 MB" },
+          { success: false, error: "La imagen principal excede el tamaño máximo de 5 MB" },
           { status: 400 }
         );
       }
@@ -351,7 +410,7 @@ export async function PUT(req: NextRequest) {
       if (imgFile && imgFile.size > 0) {
         if (imgFile.size > 5 * 1024 * 1024) {
           return NextResponse.json(
-            { success: false, error: "Image size exceeds 5 MB" },
+            { success: false, error: "Una o más imágenes nuevas exceden el tamaño máximo de 5 MB" },
             { status: 400 }
           );
         }
@@ -368,7 +427,7 @@ export async function PUT(req: NextRequest) {
     const currentProduct = await Product.findById(id);
     if (!currentProduct) {
       return NextResponse.json(
-        { success: false, error: "Product not found" },
+        { success: false, error: "Producto no encontrado" },
         { status: 404 }
       );
     }
@@ -416,15 +475,59 @@ export async function PUT(req: NextRequest) {
 
     if (!updatedProduct) {
       return NextResponse.json(
-        { success: false, error: "Product not found or unauthorized" },
+        { success: false, error: "Producto no encontrado o no autorizado" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ success: true, data: updatedProduct });
+    return NextResponse.json({
+      success: true,
+      data: updatedProduct,
+      message: "Producto actualizado exitosamente"
+    });
   } catch (error: any) {
+    console.error("Error al actualizar producto:", error);
+
+    // Manejar errores de validación de Mongoose
+    if (error.name === "ValidationError") {
+      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Error de validación: " + validationErrors.join(", ")
+        },
+        { status: 400 }
+      );
+    }
+
+    // Manejar error de clave duplicada
+    if (error.code === 11000) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Ya existe un producto con ese código de barras o código único"
+        },
+        { status: 400 }
+      );
+    }
+
+    // Manejar error de ID inválido
+    if (error.name === "CastError") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "ID de producto inválido"
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: "Error al actualizar el producto. Por favor intenta nuevamente.",
+        details: error.message
+      },
       { status: 500 }
     );
   }

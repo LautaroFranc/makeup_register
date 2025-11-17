@@ -47,7 +47,11 @@ export async function GET(req: NextRequest) {
   } catch (error: any) {
     console.error("Error fetching categories:", error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: "Error al obtener las categorías. Por favor intenta nuevamente.",
+        details: error.message
+      },
       { status: 500 }
     );
   }
@@ -61,7 +65,7 @@ export async function POST(req: NextRequest) {
     const { _id } = (await authCheck.json()).user;
 
     const body = await req.json();
-    const { name, description, color, icon } = body;
+    const { name, description, color, icon, storeId } = body;
 
     if (!name || name.trim() === "") {
       return NextResponse.json(
@@ -70,15 +74,48 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verificar si ya existe una categoría con el mismo nombre para este usuario
+    // Resolver tienda destino
+    let targetStoreId = storeId as string | undefined;
+
+    if (targetStoreId) {
+      // Validar que la tienda pertenezca al usuario
+      const Store = (await import("@/models/Store")).default;
+      const store = await Store.findOne({ _id: targetStoreId, user: _id });
+      if (!store) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "La tienda especificada no existe o no pertenece al usuario",
+          },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Tomar la primera tienda activa del usuario
+      const Store = (await import("@/models/Store")).default;
+      const store = await Store.findOne({ user: _id, isActive: true });
+      if (!store) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "No se encontró una tienda activa. Por favor crea una tienda primero.",
+          },
+          { status: 400 }
+        );
+      }
+      targetStoreId = store._id.toString();
+    }
+
+    // Verificar si ya existe una categoría con el mismo nombre para este usuario y tienda
     const existingCategory = await Category.findOne({
       user: _id,
+      store: targetStoreId,
       name: { $regex: new RegExp(`^${name.trim()}$`, "i") },
     });
 
     if (existingCategory) {
       return NextResponse.json(
-        { success: false, error: "Ya existe una categoría con este nombre" },
+        { success: false, error: "Ya existe una categoría con este nombre en esta tienda" },
         { status: 400 }
       );
     }
@@ -89,6 +126,7 @@ export async function POST(req: NextRequest) {
       color: color || "#3B82F6",
       icon: icon || "📦",
       user: _id,
+      store: targetStoreId,
     });
 
     return NextResponse.json(
@@ -101,8 +139,36 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     console.error("Error creating category:", error);
+
+    // Manejar errores de validación de Mongoose
+    if (error.name === "ValidationError") {
+      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Error de validación: " + validationErrors.join(", ")
+        },
+        { status: 400 }
+      );
+    }
+
+    // Manejar error de clave duplicada
+    if (error.code === 11000) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Ya existe una categoría con ese nombre o identificador único"
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: "Error al crear la categoría. Por favor intenta nuevamente.",
+        details: error.message
+      },
       { status: 500 }
     );
   }
@@ -172,8 +238,47 @@ export async function PUT(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error updating category:", error);
+
+    // Manejar errores de validación de Mongoose
+    if (error.name === "ValidationError") {
+      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Error de validación: " + validationErrors.join(", ")
+        },
+        { status: 400 }
+      );
+    }
+
+    // Manejar error de clave duplicada
+    if (error.code === 11000) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Ya existe una categoría con ese nombre"
+        },
+        { status: 400 }
+      );
+    }
+
+    // Manejar error de ID inválido
+    if (error.name === "CastError") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "ID de categoría inválido"
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: "Error al actualizar la categoría. Por favor intenta nuevamente.",
+        details: error.message
+      },
       { status: 500 }
     );
   }
@@ -231,8 +336,24 @@ export async function DELETE(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error deleting category:", error);
+
+    // Manejar error de ID inválido
+    if (error.name === "CastError") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "ID de categoría inválido"
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: "Error al eliminar la categoría. Por favor intenta nuevamente.",
+        details: error.message
+      },
       { status: 500 }
     );
   }

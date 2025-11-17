@@ -1,11 +1,14 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 import slugify from "slugify";
 
+export type UserRole = "admin" | "manager" | "employee";
+
 export interface IUsers extends Document {
   name: string;
   password: string;
   email: string;
   slug: string; // 👈 Agregamos el slug
+  role: UserRole; // 👈 Rol del usuario
 }
 
 const UsersSchema: Schema<IUsers> = new Schema(
@@ -25,6 +28,12 @@ const UsersSchema: Schema<IUsers> = new Schema(
     slug: {
       type: String,
       unique: true,
+    },
+    role: {
+      type: String,
+      enum: ["admin", "manager", "employee"],
+      default: "employee", // Por defecto, los nuevos usuarios son empleados
+      required: true,
     },
   },
   { timestamps: true }
