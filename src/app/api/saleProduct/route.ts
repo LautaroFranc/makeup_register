@@ -1,17 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import SaleProduct from "@/models/SaleProduct";
 import Product from "@/models/Product";
 import connectDB from "@/config/db";
+import { authMiddleware } from "../middleware";
 
 connectDB();
 
-export async function GET(request: Request) {
+export async function GET(req: NextRequest) {
   try {
+    const authCheck = await authMiddleware(req);
+    if (authCheck.status !== 200) return authCheck;
 
-    let saleProduct: any = [];
-
-      saleProduct = await SaleProduct.find();
-    
+    const userId = (await authCheck.json()).user._id;
+    const saleProduct = await SaleProduct.find({ user: userId });
 
     return NextResponse.json(saleProduct);
   } catch (error: any) {
@@ -23,14 +24,19 @@ export async function GET(request: Request) {
 }
 
 // Manejar solicitud POST (Crear nueva venta de  producto)
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-   
-    const { idProduct, stock, ...rest } =  JSON.parse(body);
+    // Autenticar usuario
+    const authCheck = await authMiddleware(req);
+    if (authCheck.status !== 200) return authCheck;
 
-    // Verificar si el producto existe
-    const product = await Product.findById(idProduct);
+    const userId = (await authCheck.json()).user._id;
+
+    const body = await req.json();
+    const { idProduct, stock, sellPrice } = body;
+
+    // Verificar si el producto existe y pertenece al usuario
+    const product = await Product.findOne({ _id: idProduct, user: userId });
     if (!product) {
       return NextResponse.json(
         { success: false, message: "Producto no encontrado." },
@@ -52,11 +58,12 @@ export async function POST(req: Request) {
 
     await product.save();
 
-    // Crear el registro de la venta
+    // Crear el registro de la venta con userId
     const newSaleProduct = await SaleProduct.create({
       idProduct,
       stock,
-      ...rest,
+      sellPrice,
+      user: userId,
     });
 
     return NextResponse.json(newSaleProduct, { status: 201 });

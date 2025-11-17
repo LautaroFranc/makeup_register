@@ -4,6 +4,7 @@ export interface IProduct extends Document {
   idProduct: string;
   sellPrice: string;
   stock: number;
+  user: mongoose.Types.ObjectId;
 }
 
 const SaleProductSchema: Schema<IProduct> = new Schema(
@@ -18,6 +19,11 @@ const SaleProductSchema: Schema<IProduct> = new Schema(
     },
     stock: {
       type: Number,
+      required: true,
+    },
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
       required: true,
     },
   },
