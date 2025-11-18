@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
     // Construir filtros de consulta
     const query: any = {
       user: user._id,
+      published: true, // Solo productos publicados para endpoint público
     };
 
     // Filtro de categoría
