@@ -171,3 +171,81 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Manejar solicitud DELETE (Eliminar venta y restaurar stock)
+export async function DELETE(req: NextRequest) {
+  try {
+    const authCheck = await authMiddleware(req);
+    if (authCheck.status !== 200) return authCheck;
+
+    const userId = (await authCheck.json()).user._id;
+
+    // Obtener el ID de la venta desde query params
+    const { searchParams } = new URL(req.url);
+    const saleId = searchParams.get("id");
+
+    if (!saleId) {
+      return NextResponse.json(
+        { success: false, message: "El ID de la venta es requerido" },
+        { status: 400 }
+      );
+    }
+
+    // Buscar la venta
+    const sale = await SaleProduct.findOne({ _id: saleId, user: userId });
+
+    if (!sale) {
+      return NextResponse.json(
+        { success: false, message: "Venta no encontrada o no tienes permiso para eliminarla" },
+        { status: 404 }
+      );
+    }
+
+    // Buscar el producto para restaurar el stock
+    const product = await Product.findById(sale.idProduct);
+
+    if (!product) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Producto asociado no encontrado. La venta será eliminada pero el stock no se restaurará.",
+        },
+        { status: 404 }
+      );
+    }
+
+    // Restaurar el stock (sumar la cantidad vendida)
+    const quantitySold = sale.stock;
+    product.stock += quantitySold;
+    await product.save();
+
+    // Eliminar la venta
+    await SaleProduct.findByIdAndDelete(saleId);
+
+    return NextResponse.json({
+      success: true,
+      message: "Venta eliminada y stock restaurado exitosamente",
+      productName: product.name,
+      quantityRestored: quantitySold,
+      newStock: product.stock,
+    });
+  } catch (error: any) {
+    console.error("Error al eliminar venta:", error);
+
+    if (error.name === "CastError") {
+      return NextResponse.json(
+        { success: false, message: "ID de venta inválido" },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error al eliminar la venta",
+        details: error.message,
+      },
+      { status: 500 }
+    );
+  }
+}

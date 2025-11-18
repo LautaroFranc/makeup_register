@@ -11,6 +11,9 @@ import {
   Settings,
   Tags,
   Store,
+  Tag,
+  Calculator,
+  History,
 } from "lucide-react";
 
 import {
@@ -54,6 +57,27 @@ const items = [
         title: "Productos",
         url: "/products/table",
         icon: Star,
+      },
+      {
+        title: "Historial de Ventas",
+        url: "/products/sales-history",
+        icon: History,
+      },
+    ],
+  },
+  {
+    title: "Promociones",
+    icon: Tag,
+    subItems: [
+      {
+        title: "Calculadora 2x1",
+        url: "/promotions/calculator",
+        icon: Calculator,
+      },
+      {
+        title: "Mis Promociones",
+        url: "/promotions",
+        icon: Tags,
       },
     ],
   },
