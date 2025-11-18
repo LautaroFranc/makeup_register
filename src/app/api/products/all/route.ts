@@ -43,8 +43,8 @@ export async function GET(req: NextRequest) {
     // Filtrar productos con precios válidos (> 0)
     if (withValidPrices) {
       query.$and = [
-        { buyPrice: { $ne: "0", $ne: "", $exists: true } },
-        { sellPrice: { $ne: "0", $ne: "", $exists: true } },
+        { buyPrice: { $nin: ["0", ""], $exists: true } },
+        { sellPrice: { $nin: ["0", ""], $exists: true } },
       ];
     }
 
