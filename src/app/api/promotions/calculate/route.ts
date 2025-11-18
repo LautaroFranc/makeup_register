@@ -171,7 +171,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (isDifferentProducts) {
+    if (isDifferentProducts && giftProduct) {
       recommendations.push({
         type: "info",
         message: `Promoción combinada: Cliente paga ${product.name} y recibe ${giftProduct.name} gratis.`,
