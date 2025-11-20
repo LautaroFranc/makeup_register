@@ -59,12 +59,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       name,
+      storeName,
       description,
+      customUrl,
       isActive = true,
       isPublic = true,
       theme = {},
       contact = {},
       settings = {},
+      paymentMethods = {},
     } = body;
 
     // Validar datos requeridos
@@ -102,8 +105,10 @@ export async function POST(req: NextRequest) {
     // Crear la tienda
     const store = new Store({
       name: name.trim(),
+      storeName: storeName?.trim(),
       slug,
       description: description?.trim(),
+      customUrl: customUrl?.trim(),
       user: _id,
       isActive,
       isPublic,
@@ -117,6 +122,8 @@ export async function POST(req: NextRequest) {
         borderColor: theme.borderColor || "#E5E7EB",
         logoUrl: theme.logoUrl,
         faviconUrl: theme.faviconUrl,
+        bannerUrls: theme.bannerUrls || [],
+        fontFamily: theme.fontFamily || "Inter, sans-serif",
         customCss: theme.customCss,
       },
       contact: {
@@ -132,6 +139,29 @@ export async function POST(req: NextRequest) {
         showStock: settings.showStock ?? true,
         enableSearch: settings.enableSearch ?? true,
         enableFilters: settings.enableFilters ?? true,
+      },
+      paymentMethods: {
+        directSale: {
+          enabled: paymentMethods.directSale?.enabled ?? false,
+          whatsapp: paymentMethods.directSale?.whatsapp,
+          instagram: paymentMethods.directSale?.instagram,
+          facebook: paymentMethods.directSale?.facebook,
+          telegram: paymentMethods.directSale?.telegram,
+        },
+        mercadoPago: {
+          enabled: paymentMethods.mercadoPago?.enabled ?? false,
+          publicKey: paymentMethods.mercadoPago?.publicKey,
+          accessToken: paymentMethods.mercadoPago?.accessToken,
+        },
+        bankTransfer: {
+          enabled: paymentMethods.bankTransfer?.enabled ?? false,
+          bankName: paymentMethods.bankTransfer?.bankName,
+          accountNumber: paymentMethods.bankTransfer?.accountNumber,
+          accountHolder: paymentMethods.bankTransfer?.accountHolder,
+          accountType: paymentMethods.bankTransfer?.accountType,
+          cbu: paymentMethods.bankTransfer?.cbu,
+          alias: paymentMethods.bankTransfer?.alias,
+        },
       },
     });
 
@@ -208,7 +238,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, description, isActive, isPublic, theme, contact, settings } =
+    const { name, storeName, description, customUrl, isActive, isPublic, theme, contact, settings, paymentMethods } =
       body;
 
     // Verificar que la tienda pertenece al usuario
@@ -239,12 +269,15 @@ export async function PUT(req: NextRequest) {
     // Actualizar campos
     const updateData: any = {};
     if (name !== undefined) updateData.name = name.trim();
+    if (storeName !== undefined) updateData.storeName = storeName?.trim();
     if (description !== undefined) updateData.description = description?.trim();
+    if (customUrl !== undefined) updateData.customUrl = customUrl?.trim();
     if (isActive !== undefined) updateData.isActive = isActive;
     if (isPublic !== undefined) updateData.isPublic = isPublic;
     if (theme) updateData.theme = { ...store.theme, ...theme };
     if (contact) updateData.contact = { ...store.contact, ...contact };
     if (settings) updateData.settings = { ...store.settings, ...settings };
+    if (paymentMethods) updateData.paymentMethods = { ...store.paymentMethods, ...paymentMethods };
 
     const updatedStore = await Store.findByIdAndUpdate(storeId, updateData, {
       new: true,

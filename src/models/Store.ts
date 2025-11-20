@@ -4,8 +4,10 @@ import slugify from "slugify";
 export interface IStore extends Document {
   _id: string;
   name: string;
+  storeName?: string; // Nombre público de la tienda (si es diferente de name)
   description?: string;
   slug: string; // URL única para la tienda
+  customUrl?: string; // URL personalizada editable por el usuario
   user: string; // Referencia al usuario propietario
   isActive: boolean; // Si la tienda está activa
   isPublic: boolean; // Si la tienda es visible públicamente
@@ -21,6 +23,8 @@ export interface IStore extends Document {
     borderColor: string;
     logoUrl?: string;
     faviconUrl?: string;
+    bannerUrls?: string[]; // Múltiples banners para slider/carrusel
+    fontFamily?: string; // Tipografía personalizada
     customCss?: string;
   };
 
@@ -55,6 +59,31 @@ export interface IStore extends Document {
     enableSearch: boolean;
     enableFilters: boolean;
   };
+
+  // Métodos de pago
+  paymentMethods: {
+    directSale: {
+      enabled: boolean;
+      whatsapp?: string;
+      instagram?: string;
+      facebook?: string;
+      telegram?: string;
+    };
+    mercadoPago?: {
+      enabled: boolean;
+      publicKey?: string;
+      accessToken?: string;
+    };
+    bankTransfer?: {
+      enabled: boolean;
+      bankName?: string;
+      accountNumber?: string;
+      accountHolder?: string;
+      accountType?: string; // "ahorros" | "corriente"
+      cbu?: string;
+      alias?: string;
+    };
+  };
 }
 
 const StoreSchema: Schema<IStore> = new Schema(
@@ -62,6 +91,10 @@ const StoreSchema: Schema<IStore> = new Schema(
     name: {
       type: String,
       required: true,
+      trim: true,
+    },
+    storeName: {
+      type: String,
       trim: true,
     },
     description: {
@@ -72,6 +105,10 @@ const StoreSchema: Schema<IStore> = new Schema(
       type: String,
       required: true,
       unique: true,
+    },
+    customUrl: {
+      type: String,
+      trim: true,
     },
     user: {
       type: String,
@@ -122,6 +159,14 @@ const StoreSchema: Schema<IStore> = new Schema(
       },
       faviconUrl: {
         type: String,
+      },
+      bannerUrls: {
+        type: [String],
+        default: [],
+      },
+      fontFamily: {
+        type: String,
+        default: "Inter, sans-serif",
       },
       customCss: {
         type: String,
@@ -205,6 +250,64 @@ const StoreSchema: Schema<IStore> = new Schema(
       enableFilters: {
         type: Boolean,
         default: true,
+      },
+    },
+
+    // Métodos de pago
+    paymentMethods: {
+      directSale: {
+        enabled: {
+          type: Boolean,
+          default: false,
+        },
+        whatsapp: {
+          type: String,
+        },
+        instagram: {
+          type: String,
+        },
+        facebook: {
+          type: String,
+        },
+        telegram: {
+          type: String,
+        },
+      },
+      mercadoPago: {
+        enabled: {
+          type: Boolean,
+          default: false,
+        },
+        publicKey: {
+          type: String,
+        },
+        accessToken: {
+          type: String,
+        },
+      },
+      bankTransfer: {
+        enabled: {
+          type: Boolean,
+          default: false,
+        },
+        bankName: {
+          type: String,
+        },
+        accountNumber: {
+          type: String,
+        },
+        accountHolder: {
+          type: String,
+        },
+        accountType: {
+          type: String,
+        },
+        cbu: {
+          type: String,
+        },
+        alias: {
+          type: String,
+        },
       },
     },
   },
