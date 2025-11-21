@@ -40,101 +40,173 @@ export async function POST(
       body = JSON.parse(body);
     }
 
-    // Aceptar tanto productId (del frontend) como idProduct (legacy)
-    const productId = body.productId || body.idProduct;
-    const quantity = body.quantity || body.stock;
-    const sellPrice = body.sellPrice;
+    // Determinar si es un array de productos o un producto único
+    const isArrayRequest = Array.isArray(body.products);
+    const productsToProcess = isArrayRequest
+      ? body.products
+      : [
+          {
+            productId: body.productId || body.idProduct,
+            quantity: body.quantity || body.stock,
+            sellPrice: body.sellPrice,
+          },
+        ];
 
-    // Validar datos requeridos
-    if (!productId) {
-      return NextResponse.json(
-        { success: false, message: "El ID del producto es requerido" },
-        { status: 400 }
-      );
-    }
-
-    if (!quantity || quantity <= 0) {
-      return NextResponse.json(
-        { success: false, message: "La cantidad debe ser mayor a 0" },
-        { status: 400 }
-      );
-    }
-
-    // Buscar el producto
-    const product = await Product.findById(productId);
-
-    if (!product) {
+    // Validar que haya productos
+    if (!productsToProcess || productsToProcess.length === 0) {
       return NextResponse.json(
         {
           success: false,
-          message: "Producto no encontrado. Verifica que el ID sea correcto.",
-          details: `ID buscado: ${productId}`,
-        },
-        { status: 404 }
-      );
-    }
-
-    // Verificar si el producto pertenece al usuario del slug
-    if (product.user.toString() !== userId) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "El producto no pertenece a este usuario. Verifica el slug y el ID del producto.",
-        },
-        { status: 403 }
-      );
-    }
-
-    // Verificar que el producto esté publicado (solo productos públicos)
-    if (!product.published) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Este producto no está disponible para venta pública",
-        },
-        { status: 403 }
-      );
-    }
-
-    // Verificar stock disponible
-    if (product.stock < quantity) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Stock insuficiente. Disponible: ${product.stock}, Solicitado: ${quantity}`,
+          message: "Debe proporcionar al menos un producto para registrar la venta",
         },
         { status: 400 }
       );
     }
 
-    // Reducir stock del producto
-    product.stock -= quantity;
-    await product.save();
+    // Arrays para almacenar resultados
+    const successfulSales = [];
+    const errors = [];
+    const productsUpdated = [];
 
-    // Crear el registro de la venta
-    const newSaleProduct = await SaleProduct.create({
-      idProduct: productId,
-      stock: quantity,
-      sellPrice: sellPrice || product.sellPrice, // Usar precio del producto si no se especifica
-      user: userId,
-      isPublicSale: true, // Marcar como venta pública
-    });
+    // Procesar cada producto
+    for (const productData of productsToProcess) {
+      try {
+        const productId = productData.productId || productData.idProduct;
+        const quantity = productData.quantity || productData.stock;
+        const sellPrice = productData.sellPrice;
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Venta registrada exitosamente",
-        sale: {
+        // Validar datos requeridos del producto
+        if (!productId) {
+          errors.push({
+            product: productData,
+            error: "El ID del producto es requerido",
+          });
+          continue;
+        }
+
+        if (!quantity || quantity <= 0) {
+          errors.push({
+            productId,
+            error: "La cantidad debe ser mayor a 0",
+          });
+          continue;
+        }
+
+        // Buscar el producto
+        const product = await Product.findById(productId);
+
+        if (!product) {
+          errors.push({
+            productId,
+            error: `Producto no encontrado`,
+          });
+          continue;
+        }
+
+        // Verificar si el producto pertenece al usuario del slug
+        if (product.user.toString() !== userId) {
+          errors.push({
+            productId,
+            productName: product.name,
+            error: "El producto no pertenece a este usuario",
+          });
+          continue;
+        }
+
+        // Verificar que el producto esté publicado (solo productos públicos)
+        if (!product.published) {
+          errors.push({
+            productId,
+            productName: product.name,
+            error: "Este producto no está disponible para venta pública",
+          });
+          continue;
+        }
+
+        // Verificar stock disponible
+        if (product.stock < quantity) {
+          errors.push({
+            productId,
+            productName: product.name,
+            error: `Stock insuficiente. Disponible: ${product.stock}, Solicitado: ${quantity}`,
+          });
+          continue;
+        }
+
+        // Reducir stock del producto
+        product.stock -= quantity;
+        await product.save();
+
+        // Crear el registro de la venta
+        const newSaleProduct = await SaleProduct.create({
+          idProduct: productId,
+          stock: quantity,
+          sellPrice: sellPrice || product.sellPrice,
+          user: userId,
+          isPublicSale: true,
+        });
+
+        // Agregar a resultados exitosos
+        successfulSales.push({
           _id: newSaleProduct._id,
+          productId,
+          productName: product.name,
           quantity: newSaleProduct.stock,
           sellPrice: newSaleProduct.sellPrice,
           createdAt: newSaleProduct.createdAt,
-        },
-        product: {
+        });
+
+        productsUpdated.push({
+          productId,
           name: product.name,
           stockRestante: product.stock,
+        });
+      } catch (error: any) {
+        errors.push({
+          productId: productData.productId || productData.idProduct,
+          error: error.message || "Error al procesar el producto",
+        });
+      }
+    }
+
+    // Determinar el resultado de la operación
+    const allSuccess = errors.length === 0;
+    const partialSuccess = successfulSales.length > 0 && errors.length > 0;
+    const allFailed = successfulSales.length === 0;
+
+    if (allFailed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "No se pudo registrar ninguna venta",
+          errors,
         },
+        { status: 400 }
+      );
+    }
+
+    if (partialSuccess) {
+      return NextResponse.json(
+        {
+          success: true,
+          message: `${successfulSales.length} venta(s) registrada(s), ${errors.length} error(es)`,
+          sales: successfulSales,
+          products: productsUpdated,
+          errors,
+        },
+        { status: 207 } // Multi-Status
+      );
+    }
+
+    // Todo exitoso
+    return NextResponse.json(
+      {
+        success: true,
+        message: isArrayRequest
+          ? `${successfulSales.length} ventas registradas exitosamente`
+          : "Venta registrada exitosamente",
+        sales: successfulSales,
+        products: productsUpdated,
       },
       { status: 201 }
     );
