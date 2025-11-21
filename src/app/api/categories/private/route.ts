@@ -23,9 +23,9 @@ export async function GET(req: NextRequest) {
     }
 
     const categories = await Category.find(query)
-      .sort({ name: 1 })
+      .sort({ orden: 1, name: 1 })
       .select(
-        "name slug description color icon isActive productCount createdAt updatedAt"
+        "name slug description color icon isActive productCount orden createdAt updatedAt"
       );
 
     // Obtener estadísticas completas de cada categoría (todos los productos)
@@ -59,6 +59,7 @@ export async function GET(req: NextRequest) {
           color: category.color,
           icon: category.icon,
           isActive: category.isActive,
+          orden: category.orden,
           totalProducts,
           publicProductCount,
           privateProductCount,

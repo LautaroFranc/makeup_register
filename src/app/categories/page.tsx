@@ -59,6 +59,7 @@ interface Category {
   color: string;
   icon: string;
   isActive: boolean;
+  orden: number;
   totalProducts: number;
   publicProductCount: number;
   privateProductCount: number;
@@ -106,6 +107,7 @@ export default function CategoriesPage() {
     icon: "📦",
     isActive: true,
     store: "",
+    orden: 0,
   });
 
   const { toast } = useToast();
@@ -321,6 +323,7 @@ export default function CategoriesPage() {
       icon: category.icon,
       isActive: category.isActive,
       store: category.store?._id || "",
+      orden: category.orden,
     });
     setIsEditModalOpen(true);
   };
@@ -334,6 +337,7 @@ export default function CategoriesPage() {
       icon: "📦",
       isActive: true,
       store: "",
+      orden: 0,
     });
   };
 
@@ -454,14 +458,23 @@ export default function CategoriesPage() {
             Administra las categorías de tus productos por tienda
           </p>
         </div>
-        <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Categoría
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={openReorderModal}
+            disabled={filteredCategories.length === 0}
+          >
+            <ArrowUpDown className="h-4 w-4 mr-2" />
+            Reordenar
+          </Button>
+          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Categoría
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
             <DialogHeader>
               <DialogTitle>Crear Nueva Categoría</DialogTitle>
             </DialogHeader>
@@ -536,6 +549,22 @@ export default function CategoriesPage() {
                   />
                 </div>
               </div>
+              <div>
+                <Label htmlFor="orden">Orden de visualización</Label>
+                <Input
+                  id="orden"
+                  type="number"
+                  min="0"
+                  value={formData.orden}
+                  onChange={(e) =>
+                    setFormData({ ...formData, orden: parseInt(e.target.value) || 0 })
+                  }
+                  placeholder="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Número que define el orden de visualización (menor número = aparece primero)
+                </p>
+              </div>
               <div className="flex items-center space-x-2">
                 <Switch
                   id="isActive"
@@ -558,6 +587,7 @@ export default function CategoriesPage() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -880,6 +910,22 @@ export default function CategoriesPage() {
                 />
               </div>
             </div>
+            <div>
+              <Label htmlFor="edit-orden">Orden de visualización</Label>
+              <Input
+                id="edit-orden"
+                type="number"
+                min="0"
+                value={formData.orden}
+                onChange={(e) =>
+                  setFormData({ ...formData, orden: parseInt(e.target.value) || 0 })
+                }
+                placeholder="0"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Número que define el orden de visualización (menor número = aparece primero)
+              </p>
+            </div>
             <div className="flex items-center space-x-2">
               <Switch
                 id="edit-isActive"
@@ -940,6 +986,77 @@ export default function CategoriesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Modal de Reordenamiento */}
+      <Dialog open={isReorderModalOpen} onOpenChange={setIsReorderModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Reordenar Categorías</DialogTitle>
+            <p className="text-sm text-gray-600">
+              Arrastra las categorías para cambiar su orden de visualización
+            </p>
+          </DialogHeader>
+          <div className="space-y-2">
+            {reorderList.map((category, index) => (
+              <div
+                key={category._id}
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragEnd={handleDragEnd}
+                className={`flex items-center justify-between p-3 border rounded-lg cursor-move hover:bg-gray-50 transition-colors ${
+                  draggedIndex === index ? "opacity-50" : ""
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <GripVertical className="h-5 w-5 text-gray-400" />
+                  <span
+                    style={{ color: category.color }}
+                    className="text-xl"
+                  >
+                    {category.icon}
+                  </span>
+                  <div>
+                    <p className="font-medium">{category.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {category.totalProducts} productos
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => moveUp(index)}
+                    disabled={index === 0}
+                  >
+                    ↑
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => moveDown(index)}
+                    disabled={index === reorderList.length - 1}
+                  >
+                    ↓
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setIsReorderModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveOrder}>
+              Guardar Orden
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

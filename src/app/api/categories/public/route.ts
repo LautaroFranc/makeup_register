@@ -25,8 +25,8 @@ export async function GET(req: NextRequest) {
       name: { $in: categoriesWithPublicProducts },
       isActive: true,
     })
-      .sort({ name: 1 })
-      .select("name description color icon productCount");
+      .sort({ orden: 1, name: 1 })
+      .select("name description color icon productCount orden");
 
     // Obtener estadísticas de productos publicados por categoría
     const categoriesWithStats = await Promise.all(

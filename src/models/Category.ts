@@ -9,6 +9,7 @@ export interface ICategory extends Document {
   store: string; // Referencia a la tienda
   isActive: boolean; // Si la categoría está activa
   productCount: number; // Contador de productos en esta categoría
+  orden: number; // Orden de visualización de la categoría
 }
 
 const CategorySchema: Schema<ICategory> = new Schema(
@@ -45,6 +46,10 @@ const CategorySchema: Schema<ICategory> = new Schema(
       default: true,
     },
     productCount: {
+      type: Number,
+      default: 0,
+    },
+    orden: {
       type: Number,
       default: 0,
     },

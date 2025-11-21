@@ -35,9 +35,9 @@ export async function GET(req: NextRequest) {
     }
 
     const categories = await Category.find(query)
-      .sort({ name: 1 })
+      .sort({ orden: 1, name: 1 })
       .select(
-        "name slug description color icon isActive productCount createdAt updatedAt"
+        "name slug description color icon isActive productCount orden createdAt updatedAt"
       );
 
     return NextResponse.json({
@@ -182,7 +182,7 @@ export async function PUT(req: NextRequest) {
     const { _id } = (await authCheck.json()).user;
 
     const body = await req.json();
-    const { categoryId, name, description, color, icon, isActive } = body;
+    const { categoryId, name, description, color, icon, isActive, orden } = body;
 
     if (!categoryId) {
       return NextResponse.json(
@@ -224,6 +224,7 @@ export async function PUT(req: NextRequest) {
     if (color !== undefined) updateData.color = color;
     if (icon !== undefined) updateData.icon = icon;
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (orden !== undefined) updateData.orden = orden;
 
     const updatedCategory = await Category.findByIdAndUpdate(
       categoryId,
