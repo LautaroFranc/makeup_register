@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, RotateCcw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { StorePreviewButton } from "@/components/StorePreviewButton";
 
 interface Product {
   _id: string;
@@ -516,6 +517,9 @@ export default function ProductDashboard() {
         product={selectedProduct}
         loading={loadingSale}
       />
+
+      {/* Botón Flotante de Vista Previa */}
+      <StorePreviewButton />
     </div>
   );
 }

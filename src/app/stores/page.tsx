@@ -326,56 +326,103 @@ export default function StoresPage() {
     }
   };
 
+  // Obtener detalle completo de una tienda
+  const fetchStoreDetail = async (storeId: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`/api/stores?id=${storeId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.store;
+      } else {
+        throw new Error("Error al cargar el detalle de la tienda");
+      }
+    } catch (error) {
+      console.error("Error fetching store detail:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el detalle de la tienda",
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
+
   // Editar tienda
-  const handleEditStore = (store: Store) => {
-    setEditingStore(store);
+  const handleEditStore = async (store: Store) => {
+    // Obtener el detalle completo de la tienda
+    const fullStoreData = await fetchStoreDetail(store._id);
+
+    if (!fullStoreData) {
+      return; // Si hay error, no abrir el modal
+    }
+
+    setEditingStore(fullStoreData);
     setStoreFormData({
-      name: store.name,
-      storeName: store.storeName || "",
-      description: store.description || "",
-      customUrl: store.customUrl || "",
-      isActive: store.isActive,
-      isPublic: store.isPublic,
+      name: fullStoreData.name,
+      storeName: fullStoreData.storeName || "",
+      description: fullStoreData.description || "",
+      customUrl: fullStoreData.customUrl || "",
+      isActive: fullStoreData.isActive,
+      isPublic: fullStoreData.isPublic,
       theme: {
-        ...store.theme,
-        logoUrl: store.theme.logoUrl || "",
-        faviconUrl: store.theme.faviconUrl || "",
-        bannerUrls: store.theme.bannerUrls || [],
-        fontFamily: store.theme.fontFamily || "Inter, sans-serif",
-        customCss: store.theme.customCss || "",
+        primaryColor: fullStoreData.theme?.primaryColor || "#3B82F6",
+        secondaryColor: fullStoreData.theme?.secondaryColor || "#10B981",
+        accentColor: fullStoreData.theme?.accentColor || "#F59E0B",
+        backgroundColor: fullStoreData.theme?.backgroundColor || "#FFFFFF",
+        textColor: fullStoreData.theme?.textColor || "#1F2937",
+        cardBackground: fullStoreData.theme?.cardBackground || "#F9FAFB",
+        borderColor: fullStoreData.theme?.borderColor || "#E5E7EB",
+        logoUrl: fullStoreData.theme?.logoUrl || "",
+        faviconUrl: fullStoreData.theme?.faviconUrl || "",
+        bannerUrls: fullStoreData.theme?.bannerUrls || [],
+        fontFamily: fullStoreData.theme?.fontFamily || "Inter, sans-serif",
+        customCss: fullStoreData.theme?.customCss || "",
       },
       contact: {
-        email: store.contact?.email || "",
-        phone: store.contact?.phone || "",
-        address: store.contact?.address || "",
+        email: fullStoreData.contact?.email || "",
+        phone: fullStoreData.contact?.phone || "",
+        address: fullStoreData.contact?.address || "",
         socialMedia: {
-          instagram: store.contact?.socialMedia?.instagram || "",
-          facebook: store.contact?.socialMedia?.facebook || "",
-          twitter: store.contact?.socialMedia?.twitter || "",
+          instagram: fullStoreData.contact?.socialMedia?.instagram || "",
+          facebook: fullStoreData.contact?.socialMedia?.facebook || "",
+          twitter: fullStoreData.contact?.socialMedia?.twitter || "",
         },
       },
-      settings: store.settings,
+      settings: {
+        allowPublicView: fullStoreData.settings?.allowPublicView ?? true,
+        requireLogin: fullStoreData.settings?.requireLogin ?? false,
+        showPrices: fullStoreData.settings?.showPrices ?? true,
+        showStock: fullStoreData.settings?.showStock ?? true,
+        enableSearch: fullStoreData.settings?.enableSearch ?? true,
+        enableFilters: fullStoreData.settings?.enableFilters ?? true,
+      },
       paymentMethods: {
         directSale: {
-          enabled: store.paymentMethods?.directSale?.enabled ?? false,
-          whatsapp: store.paymentMethods?.directSale?.whatsapp ?? "",
-          instagram: store.paymentMethods?.directSale?.instagram ?? "",
-          facebook: store.paymentMethods?.directSale?.facebook ?? "",
-          telegram: store.paymentMethods?.directSale?.telegram ?? "",
+          enabled: fullStoreData.paymentMethods?.directSale?.enabled ?? false,
+          whatsapp: fullStoreData.paymentMethods?.directSale?.whatsapp ?? "",
+          instagram: fullStoreData.paymentMethods?.directSale?.instagram ?? "",
+          facebook: fullStoreData.paymentMethods?.directSale?.facebook ?? "",
+          telegram: fullStoreData.paymentMethods?.directSale?.telegram ?? "",
         },
         mercadoPago: {
-          enabled: store.paymentMethods?.mercadoPago?.enabled ?? false,
-          publicKey: store.paymentMethods?.mercadoPago?.publicKey ?? "",
-          accessToken: store.paymentMethods?.mercadoPago?.accessToken ?? "",
+          enabled: fullStoreData.paymentMethods?.mercadoPago?.enabled ?? false,
+          publicKey: fullStoreData.paymentMethods?.mercadoPago?.publicKey ?? "",
+          accessToken: fullStoreData.paymentMethods?.mercadoPago?.accessToken ?? "",
         },
         bankTransfer: {
-          enabled: store.paymentMethods?.bankTransfer?.enabled ?? false,
-          bankName: store.paymentMethods?.bankTransfer?.bankName ?? "",
-          accountNumber: store.paymentMethods?.bankTransfer?.accountNumber ?? "",
-          accountHolder: store.paymentMethods?.bankTransfer?.accountHolder ?? "",
-          accountType: store.paymentMethods?.bankTransfer?.accountType ?? "",
-          cbu: store.paymentMethods?.bankTransfer?.cbu ?? "",
-          alias: store.paymentMethods?.bankTransfer?.alias ?? "",
+          enabled: fullStoreData.paymentMethods?.bankTransfer?.enabled ?? false,
+          bankName: fullStoreData.paymentMethods?.bankTransfer?.bankName ?? "",
+          accountNumber: fullStoreData.paymentMethods?.bankTransfer?.accountNumber ?? "",
+          accountHolder: fullStoreData.paymentMethods?.bankTransfer?.accountHolder ?? "",
+          accountType: fullStoreData.paymentMethods?.bankTransfer?.accountType ?? "",
+          cbu: fullStoreData.paymentMethods?.bankTransfer?.cbu ?? "",
+          alias: fullStoreData.paymentMethods?.bankTransfer?.alias ?? "",
         },
       },
     });

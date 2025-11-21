@@ -9,78 +9,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/contexts/UserContext";
 import {
-  Plus,
-  Edit,
-  Trash2,
-  Eye,
-  EyeOff,
   Package,
-  TrendingUp,
-  DollarSign,
   Loader2,
   Settings,
-  Tags,
   User,
-  Bell,
   Shield,
-  Database,
   Palette,
   Building2,
   Monitor,
 } from "lucide-react";
 
-interface Category {
-  _id: string;
-  name: string;
-  slug: string;
-  description: string;
-  color: string;
-  icon: string;
-  isActive: boolean;
-  totalProducts: number;
-  publicProductCount: number;
-  privateProductCount: number;
-  totalStock: number;
-  totalValue: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export default function SettingsPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [deleteCategory, setDeleteCategory] = useState<Category | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    color: "#3B82F6",
-    icon: "📦",
-    isActive: true,
-  });
   const [userFormData, setUserFormData] = useState({
     name: "",
     email: "",
@@ -105,35 +49,6 @@ export default function SettingsPage() {
   });
   const { toast } = useToast();
   const { user } = useUser();
-
-  // Cargar categorías
-  const fetchCategories = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("token");
-      const response = await fetch("/api/categories/private", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data.categories);
-      } else {
-        throw new Error("Error al cargar categorías");
-      }
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las categorías",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Cargar tiendas
   const fetchStores = async () => {
@@ -162,8 +77,8 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    fetchCategories();
     fetchStores();
+    setLoading(false);
     if (user) {
       setUserFormData({
         name: user.name || "",
@@ -172,155 +87,6 @@ export default function SettingsPage() {
       });
     }
   }, [user]);
-
-  // Crear categoría
-  const handleCreateCategory = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch("/api/categories", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast({
-          title: "Éxito",
-          description: "Categoría creada exitosamente",
-          variant: "default",
-        });
-        setIsCreateModalOpen(false);
-        setFormData({
-          name: "",
-          description: "",
-          color: "#3B82F6",
-          icon: "📦",
-          isActive: true,
-        });
-        fetchCategories();
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: `Error al crear categoría: ${error}`,
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Actualizar categoría
-  const handleUpdateCategory = async () => {
-    if (!editingCategory) return;
-
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch("/api/categories", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          categoryId: editingCategory._id,
-          ...formData,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast({
-          title: "Éxito",
-          description: "Categoría actualizada exitosamente",
-          variant: "default",
-        });
-        setIsEditModalOpen(false);
-        setEditingCategory(null);
-        setFormData({
-          name: "",
-          description: "",
-          color: "#3B82F6",
-          icon: "📦",
-          isActive: true,
-        });
-        fetchCategories();
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: `Error al actualizar categoría: ${error}`,
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Eliminar categoría
-  const handleDeleteCategory = async () => {
-    if (!deleteCategory) return;
-
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`/api/categories?id=${deleteCategory._id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast({
-          title: "Éxito",
-          description: "Categoría eliminada exitosamente",
-          variant: "default",
-        });
-        setDeleteCategory(null);
-        fetchCategories();
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: `Error al eliminar categoría: ${error}`,
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Abrir modal de edición
-  const openEditModal = (category: Category) => {
-    setEditingCategory(category);
-    setFormData({
-      name: category.name,
-      description: category.description,
-      color: category.color,
-      icon: category.icon,
-      isActive: category.isActive,
-    });
-    setIsEditModalOpen(true);
-  };
-
-  // Resetear formulario
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      description: "",
-      color: "#3B82F6",
-      icon: "📦",
-      isActive: true,
-    });
-  };
 
   // Actualizar perfil de usuario
   const handleUpdateProfile = async () => {
@@ -428,12 +194,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Tabs de Configuración */}
-      <Tabs defaultValue="categories" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="categories" className="flex items-center gap-2">
-            <Tags className="h-4 w-4" />
-            Categorías
-          </TabsTrigger>
+      <Tabs defaultValue="products" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="products" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Productos
@@ -451,253 +213,6 @@ export default function SettingsPage() {
             Página
           </TabsTrigger>
         </TabsList>
-
-        {/* Tab de Categorías */}
-        <TabsContent value="categories" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-semibold">Gestión de Categorías</h2>
-              <p className="text-gray-600">
-                Administra las categorías de tus productos
-              </p>
-            </div>
-            <Dialog
-              open={isCreateModalOpen}
-              onOpenChange={setIsCreateModalOpen}
-            >
-              <DialogTrigger asChild>
-                <Button onClick={resetForm}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nueva Categoría
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Crear Nueva Categoría</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="name">Nombre</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      placeholder="Nombre de la categoría"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="description">Descripción</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          description: e.target.value,
-                        })
-                      }
-                      placeholder="Descripción opcional"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="color">Color</Label>
-                      <Input
-                        id="color"
-                        type="color"
-                        value={formData.color}
-                        onChange={(e) =>
-                          setFormData({ ...formData, color: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="icon">Icono</Label>
-                      <Input
-                        id="icon"
-                        value={formData.icon}
-                        onChange={(e) =>
-                          setFormData({ ...formData, icon: e.target.value })
-                        }
-                        placeholder="📦"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="isActive"
-                      checked={formData.isActive}
-                      onCheckedChange={(checked) =>
-                        setFormData({ ...formData, isActive: checked })
-                      }
-                    />
-                    <Label htmlFor="isActive">Categoría activa</Label>
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsCreateModalOpen(false)}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button onClick={handleCreateCategory}>Crear</Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {/* Estadísticas de Categorías */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Categorías
-                </CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{categories.length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Categorías Activas
-                </CardTitle>
-                <Eye className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {categories.filter((c) => c.isActive).length}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Con Productos
-                </CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {categories.filter((c) => c.totalProducts > 0).length}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Valor Total
-                </CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  $
-                  {categories
-                    .reduce((sum, c) => sum + parseFloat(c.totalValue), 0)
-                    .toFixed(2)}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Lista de Categorías */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {categories.map((category) => (
-              <Card key={category._id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span
-                        style={{ color: category.color }}
-                        className="text-2xl"
-                      >
-                        {category.icon}
-                      </span>
-                      <div>
-                        <CardTitle className="text-lg">
-                          {category.name}
-                        </CardTitle>
-                        <p className="text-sm text-gray-600">
-                          {category.description}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {category.isActive ? (
-                        <Badge variant="default">
-                          <Eye className="h-3 w-3 mr-1" />
-                          Activa
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">
-                          <EyeOff className="h-3 w-3 mr-1" />
-                          Inactiva
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Total Productos:</span>
-                      <span className="font-medium">
-                        {category.totalProducts}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Públicos:</span>
-                      <span className="font-medium text-green-600">
-                        {category.publicProductCount}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Privados:</span>
-                      <span className="font-medium text-orange-600">
-                        {category.privateProductCount}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Stock Total:</span>
-                      <span className="font-medium">{category.totalStock}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Valor Total:</span>
-                      <span className="font-medium">
-                        ${category.totalValue}
-                      </span>
-                    </div>
-                    <div className="flex justify-between pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openEditModal(category)}
-                      >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Editar
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => setDeleteCategory(category)}
-                        disabled={category.totalProducts > 0}
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Eliminar
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
 
         {/* Tab de Productos */}
         <TabsContent value="products" className="space-y-6">
@@ -1306,120 +821,6 @@ export default function SettingsPage() {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Modal de Edición de Categorías */}
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Categoría</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-name">Nombre</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="Nombre de la categoría"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-description">Descripción</Label>
-              <Textarea
-                id="edit-description"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                placeholder="Descripción opcional"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-color">Color</Label>
-                <Input
-                  id="edit-color"
-                  type="color"
-                  value={formData.color}
-                  onChange={(e) =>
-                    setFormData({ ...formData, color: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-icon">Icono</Label>
-                <Input
-                  id="edit-icon"
-                  value={formData.icon}
-                  onChange={(e) =>
-                    setFormData({ ...formData, icon: e.target.value })
-                  }
-                  placeholder="📦"
-                />
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="edit-isActive"
-                checked={formData.isActive}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, isActive: checked })
-                }
-              />
-              <Label htmlFor="edit-isActive">Categoría activa</Label>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => setIsEditModalOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button onClick={handleUpdateCategory}>Actualizar</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal de Eliminación de Categorías */}
-      <AlertDialog
-        open={!!deleteCategory}
-        onOpenChange={() => setDeleteCategory(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar categoría?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente la
-              categoría "{deleteCategory?.name}".
-              {deleteCategory && deleteCategory.totalProducts > 0 && (
-                <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-                  <p className="text-red-600 font-medium">
-                    ⚠️ Esta categoría tiene {deleteCategory.totalProducts}{" "}
-                    producto(s) asociado(s).
-                  </p>
-                  <p className="text-red-600 text-sm">
-                    Primero debes mover o eliminar los productos antes de
-                    eliminar la categoría.
-                  </p>
-                </div>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteCategory}
-              disabled={!!(deleteCategory && deleteCategory.totalProducts > 0)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

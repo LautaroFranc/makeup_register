@@ -12,6 +12,7 @@ import { Product } from "@/interface/product";
 import { CategorySelector } from "@/components/CategorySelect";
 import { ImageUploadSquare } from "@/components/ImageUploadSquare";
 import { DynamicAttributes } from "@/components/DynamicAttributes";
+import { StorePreviewButton } from "@/components/StorePreviewButton";
 
 const ProductForm = () => {
   const [name, setName] = useState("");
@@ -233,6 +234,9 @@ const ProductForm = () => {
           </Button>
         </div>
       </form>
+
+      {/* Botón Flotante de Vista Previa */}
+      <StorePreviewButton />
     </div>
   );
 };

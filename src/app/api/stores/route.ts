@@ -6,7 +6,7 @@ import slugify from "slugify";
 
 connectDB();
 
-// GET - Obtener todas las tiendas del usuario
+// GET - Obtener todas las tiendas del usuario o detalle de una tienda
 export async function GET(req: NextRequest) {
   try {
     const authCheck = await authMiddleware(req);
@@ -14,6 +14,26 @@ export async function GET(req: NextRequest) {
     const { _id } = (await authCheck.json()).user;
 
     const { searchParams } = new URL(req.url);
+    const storeId = searchParams.get("id");
+
+    // Si se proporciona un ID, devolver el detalle completo de la tienda
+    if (storeId) {
+      const store = await Store.findOne({ _id: storeId, user: _id });
+
+      if (!store) {
+        return NextResponse.json(
+          { success: false, error: "Tienda no encontrada" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        store,
+      });
+    }
+
+    // Si no hay ID, devolver la lista de tiendas
     const includeInactive = searchParams.get("includeInactive") === "true";
     const includePrivate = searchParams.get("includePrivate") === "true";
 

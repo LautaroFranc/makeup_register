@@ -14,6 +14,7 @@ import {
   Tag,
   Calculator,
   History,
+  FolderTree,
 } from "lucide-react";
 
 import {
@@ -64,6 +65,11 @@ const items = [
         icon: History,
       },
     ],
+  },
+  {
+    title: "Categorías",
+    url: "/categories",
+    icon: FolderTree,
   },
   {
     title: "Promociones",
