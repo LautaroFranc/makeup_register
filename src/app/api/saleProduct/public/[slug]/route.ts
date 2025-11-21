@@ -57,7 +57,8 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          message: "Debe proporcionar al menos un producto para registrar la venta",
+          message:
+            "Debe proporcionar al menos un producto para registrar la venta",
         },
         { status: 400 }
       );
@@ -179,7 +180,7 @@ export async function POST(
         {
           success: false,
           message: "No se pudo registrar ninguna venta",
-          errors,
+          errors: errors[0],
         },
         { status: 400 }
       );
