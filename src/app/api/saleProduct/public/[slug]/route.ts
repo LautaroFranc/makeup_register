@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import SaleProduct from "@/models/SaleProduct";
 import Product from "@/models/Product";
 import Users from "@/models/Users";
+import Store from "@/models/Store";
 import connectDB from "@/config/db";
 
 connectDB();
 
-// POST - Registrar venta pública usando el slug del usuario
+// POST - Registrar venta pública usando el slug de la tienda o del usuario
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -16,21 +17,31 @@ export async function POST(
 
     if (!slug) {
       return NextResponse.json(
-        { success: false, message: "El slug del usuario es requerido" },
+        { success: false, message: "El slug es requerido" },
         { status: 400 }
       );
     }
 
-    // Buscar el usuario por slug
-    const user = await Users.findOne({ slug });
-    if (!user) {
-      return NextResponse.json(
-        { success: false, message: "Usuario no encontrado" },
-        { status: 404 }
-      );
-    }
+    // Intentar buscar primero por slug de tienda
+    let store = await Store.findOne({ slug, isActive: true, isPublic: true });
+    let userId: string;
+    let storeId: string | null = null;
 
-    const userId = user._id as string;
+    if (store) {
+      // Se encontró tienda, usar su usuario
+      userId = store.user.toString();
+      storeId = store._id.toString();
+    } else {
+      // Si no se encuentra tienda, buscar por slug de usuario (retrocompatibilidad)
+      const user = await Users.findOne({ slug });
+      if (!user) {
+        return NextResponse.json(
+          { success: false, message: "Tienda o usuario no encontrado" },
+          { status: 404 }
+        );
+      }
+      userId = (user._id as any).toString();
+    }
 
     // Parsear el body
     let body = await req.json();
@@ -104,12 +115,23 @@ export async function POST(
           continue;
         }
 
-        // Verificar si el producto pertenece al usuario del slug
-        if (product.user.toString() !== userId) {
+        // Verificar si el producto pertenece a la tienda o al usuario
+        const productBelongsToStore = storeId
+          ? product.store?.toString() === storeId
+          : product.user.toString() === userId;
+
+        if (!productBelongsToStore) {
           errors.push({
             productId,
             productName: product.name,
-            error: "El producto no pertenece a este usuario",
+            error: "El producto no pertenece a esta tienda",
+            debug: {
+              productStore: product.store?.toString(),
+              expectedStoreId: storeId,
+              productUser: product.user?.toString(),
+              expectedUserId: userId,
+              lookupMode: storeId ? "store" : "user",
+            },
           });
           continue;
         }
@@ -134,9 +156,12 @@ export async function POST(
           continue;
         }
 
-        // Reducir stock del producto
-        product.stock -= quantity;
-        await product.save();
+        // Reducir stock del producto (usando updateOne para evitar validaciones innecesarias)
+        const newStock = product.stock - quantity;
+        await Product.updateOne(
+          { _id: productId },
+          { $set: { stock: newStock } }
+        );
 
         // Crear el registro de la venta
         const newSaleProduct = await SaleProduct.create({
@@ -160,7 +185,7 @@ export async function POST(
         productsUpdated.push({
           productId,
           name: product.name,
-          stockRestante: product.stock,
+          stockRestante: newStock,
         });
       } catch (error: any) {
         errors.push({
