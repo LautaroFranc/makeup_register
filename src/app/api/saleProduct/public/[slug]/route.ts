@@ -196,7 +196,6 @@ export async function POST(
     }
 
     // Determinar el resultado de la operación
-    const allSuccess = errors.length === 0;
     const partialSuccess = successfulSales.length > 0 && errors.length > 0;
     const allFailed = successfulSales.length === 0;
 
