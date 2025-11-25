@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Product from "@/models/Product";
+import GlobalDiscount from "@/models/GlobalDiscount";
+import Store from "@/models/Store";
 import connectDB from "@/config/db";
 import { authMiddleware } from "../../middleware";
 
@@ -85,6 +87,53 @@ export async function GET(req: NextRequest) {
       .skip(skip)
       .limit(limit);
 
+    // Obtener la tienda activa del usuario
+    const store = await Store.findOne({ user: _id, isActive: true });
+
+    // Obtener el descuento global activo si existe
+    let globalDiscount = null;
+    if (store) {
+      globalDiscount = await GlobalDiscount.findOne({
+        user: _id,
+        store: store._id,
+        isActive: true,
+      });
+    }
+
+    // Aplicar descuento global a productos que no tienen descuento individual
+    const productsWithDiscount = products.map((product) => {
+      const productObj = product.toObject();
+
+      // Si el producto ya tiene descuento individual, no aplicar el global
+      if (productObj.hasDiscount && productObj.discountPercentage > 0) {
+        return productObj;
+      }
+
+      // Si hay descuento global activo, aplicarlo
+      if (globalDiscount) {
+        const now = new Date();
+        const isWithinDateRange =
+          (!globalDiscount.endDate || new Date(globalDiscount.endDate) >= now);
+
+        if (isWithinDateRange) {
+          const sellPrice = parseFloat(productObj.sellPrice);
+          const discountedPrice = sellPrice * (1 - globalDiscount.discountPercentage / 100);
+
+          return {
+            ...productObj,
+            hasDiscount: true,
+            discountPercentage: globalDiscount.discountPercentage,
+            discountedPrice: discountedPrice.toFixed(2),
+            discountStartDate: globalDiscount.startDate,
+            discountEndDate: globalDiscount.endDate,
+            isGlobalDiscount: true, // Flag para indicar que es descuento global
+          };
+        }
+      }
+
+      return productObj;
+    });
+
     // Contar total de productos con filtros para calcular páginas
     const totalProducts = await Product.countDocuments(query);
     const totalPages = Math.ceil(totalProducts / limit);
@@ -96,7 +145,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      products,
+      products: productsWithDiscount,
       pagination: {
         currentPage: page,
         totalPages,

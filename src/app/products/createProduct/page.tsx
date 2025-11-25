@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { useFetch } from "@/hooks/useFetch";
@@ -25,6 +26,10 @@ const ProductForm = () => {
   const [images, setImages] = useState<string[]>([]);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [attributes, setAttributes] = useState<{ [key: string]: string[] }>({});
+  const [hasDiscount, setHasDiscount] = useState(false);
+  const [discountPercentage, setDiscountPercentage] = useState(0);
+  const [discountStartDate, setDiscountStartDate] = useState("");
+  const [discountEndDate, setDiscountEndDate] = useState("");
   const { toast } = useToast();
   const { data, error, loading, fetchData } = useFetch<Product[]>();
 
@@ -58,6 +63,10 @@ const ProductForm = () => {
       setImages([]);
       setUploadedImages([]);
       setAttributes({});
+      setHasDiscount(false);
+      setDiscountPercentage(0);
+      setDiscountStartDate("");
+      setDiscountEndDate("");
     }
   }, [data]);
   useEffect(() => {
@@ -80,6 +89,10 @@ const ProductForm = () => {
     formData.append("stock", stock + "");
     formData.append("category", category + "");
     formData.append("attributes", JSON.stringify(attributes));
+    formData.append("hasDiscount", hasDiscount + "");
+    formData.append("discountPercentage", discountPercentage + "");
+    if (discountStartDate) formData.append("discountStartDate", discountStartDate);
+    if (discountEndDate) formData.append("discountEndDate", discountEndDate);
 
     // Agregar múltiples imágenes
     uploadedImages.forEach((img, index) => {
@@ -195,6 +208,88 @@ const ProductForm = () => {
               />
             </div>
           </div>
+        </div>
+
+        {/* Descuentos */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+            Descuentos
+          </h3>
+
+          {/* Switch para activar descuento */}
+          <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
+            <Switch
+              id="hasDiscount"
+              checked={hasDiscount}
+              onCheckedChange={setHasDiscount}
+            />
+            <Label htmlFor="hasDiscount" className="text-sm font-medium cursor-pointer">
+              Activar descuento en este producto
+            </Label>
+          </div>
+
+          {/* Campos de descuento (solo si está activado) */}
+          {hasDiscount && (
+            <div className="space-y-4 p-4 border rounded-lg bg-blue-50">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Porcentaje de descuento */}
+                <div>
+                  <Label htmlFor="discountPercentage">Descuento (%)</Label>
+                  <Input
+                    id="discountPercentage"
+                    type="number"
+                    value={discountPercentage}
+                    onChange={(e) => setDiscountPercentage(Number(e.target.value))}
+                    placeholder="Ej: 10"
+                    min="0"
+                    max="100"
+                    step="1"
+                  />
+                </div>
+
+                {/* Fecha de inicio */}
+                <div>
+                  <Label htmlFor="discountStartDate">Fecha de Inicio</Label>
+                  <Input
+                    id="discountStartDate"
+                    type="date"
+                    value={discountStartDate}
+                    onChange={(e) => setDiscountStartDate(e.target.value)}
+                  />
+                </div>
+
+                {/* Fecha de fin */}
+                <div>
+                  <Label htmlFor="discountEndDate">Fecha de Fin</Label>
+                  <Input
+                    id="discountEndDate"
+                    type="date"
+                    value={discountEndDate}
+                    onChange={(e) => setDiscountEndDate(e.target.value)}
+                    min={discountStartDate}
+                  />
+                </div>
+              </div>
+
+              {/* Vista previa del precio con descuento */}
+              {discountPercentage > 0 && salePrice > 0 && (
+                <div className="p-3 bg-white rounded-lg border border-blue-200">
+                  <p className="text-sm text-gray-600 mb-1">Vista previa:</p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg text-gray-400 line-through">
+                      ${salePrice.toFixed(2)}
+                    </span>
+                    <span className="text-2xl font-bold text-blue-600">
+                      ${(salePrice * (1 - discountPercentage / 100)).toFixed(2)}
+                    </span>
+                    <span className="px-2 py-1 bg-red-500 text-white text-xs font-bold rounded">
+                      -{discountPercentage}%
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Imágenes */}

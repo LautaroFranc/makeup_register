@@ -11,6 +11,7 @@ import {
   MoreVertical,
   EyeOff,
   Settings,
+  Percent,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -25,6 +26,7 @@ import { AttributesModal } from "@/components/AttributesModal";
 import { ProductEditModal } from "@/components/ProductEditModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { BarcodeModal } from "@/components/BarcodeModal";
+import { DiscountModal } from "@/components/DiscountModal";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -44,6 +46,11 @@ interface Product {
   category: string;
   user: string;
   published: boolean;
+  hasDiscount?: boolean;
+  discountPercentage?: number;
+  discountedPrice?: string;
+  discountStartDate?: string;
+  discountEndDate?: string;
 }
 
 interface EditingCell {
@@ -73,6 +80,7 @@ const ProductRow: React.FC<ProductRowProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
+  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
@@ -183,6 +191,11 @@ const ProductRow: React.FC<ProductRowProps> = ({
 
   const handleBarcodeClick = useCallback(() => {
     setIsBarcodeModalOpen(true);
+    setIsDropdownOpen(false);
+  }, []);
+
+  const handleDiscountClick = useCallback(() => {
+    setIsDiscountModalOpen(true);
     setIsDropdownOpen(false);
   }, []);
 
@@ -472,7 +485,7 @@ const ProductRow: React.FC<ProductRowProps> = ({
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem onClick={handleEditClick}>
                 <Edit className="h-4 w-4 mr-2" />
                 Editar producto
@@ -480,6 +493,13 @@ const ProductRow: React.FC<ProductRowProps> = ({
               <DropdownMenuItem onClick={handleBarcodeClick}>
                 <Barcode className="h-4 w-4 mr-2" />
                 Ver código de barras
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleDiscountClick}
+                className={product.hasDiscount ? "text-blue-600 focus:text-blue-600" : ""}
+              >
+                <Percent className="h-4 w-4 mr-2" />
+                {product.hasDiscount ? "Editar descuento" : "Agregar descuento"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -527,6 +547,13 @@ const ProductRow: React.FC<ProductRowProps> = ({
         onConfirm={handleConfirmDelete}
         productName={product.name}
         isLoading={isDeleting}
+      />
+
+      <DiscountModal
+        product={product}
+        isOpen={isDiscountModalOpen}
+        onClose={() => setIsDiscountModalOpen(false)}
+        onRefresh={onRefresh}
       />
 
       <BarcodeModal

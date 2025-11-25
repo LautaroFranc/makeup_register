@@ -4,6 +4,7 @@ import connectDB from "@/config/db"; // Ruta de conexión a la base de datos
 import cloudinary from "@/config/cloudinary";
 import { authMiddleware } from "../middleware";
 import Store from "@/models/Store";
+import GlobalDiscount from "@/models/GlobalDiscount";
 import Users from "@/models/Users";
 import { generateArgentineBarcode } from "@/lib/barcodeUtils";
 
@@ -106,8 +107,55 @@ export async function GET(req: NextRequest) {
       .skip(skip)
       .limit(limit)
       .select(
-        "name description image images sellPrice category barcode stock published"
-      ); // Incluir stock y published para filtros
+        "name description image images sellPrice category barcode stock published hasDiscount discountPercentage discountedPrice discountStartDate discountEndDate"
+      );
+
+    // Obtener la tienda activa del usuario para aplicar descuento global
+    const store = await Store.findOne({ user: user._id, isActive: true });
+
+    // Obtener el descuento global activo si existe
+    let globalDiscount = null;
+    if (store) {
+      globalDiscount = await GlobalDiscount.findOne({
+        user: user._id,
+        store: store._id,
+        isActive: true,
+      });
+    }
+
+    // Aplicar descuento global a productos que no tienen descuento individual
+    const productsWithDiscount = products.map((product) => {
+      const productObj = product.toObject();
+
+      // Si el producto ya tiene descuento individual, no aplicar el global
+      if (productObj.hasDiscount && productObj.discountPercentage > 0) {
+        return productObj;
+      }
+
+      // Si hay descuento global activo, aplicarlo
+      if (globalDiscount) {
+        const now = new Date();
+        const isWithinDateRange =
+          (!globalDiscount.endDate || new Date(globalDiscount.endDate) >= now);
+
+        if (isWithinDateRange) {
+          const sellPrice = parseFloat(productObj.sellPrice);
+          const discountedPrice = sellPrice * (1 - globalDiscount.discountPercentage / 100);
+
+          return {
+            ...productObj,
+            hasDiscount: true,
+            discountPercentage: globalDiscount.discountPercentage,
+            discountedPrice: discountedPrice.toFixed(2),
+            discountStartDate: globalDiscount.startDate,
+            discountEndDate: globalDiscount.endDate,
+            isGlobalDiscount: true,
+          };
+        }
+      }
+
+      return productObj;
+    });
 
     // Contar total de productos con filtros para calcular páginas
     const totalProducts = await Product.countDocuments(query);
@@ -121,7 +169,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      products,
+      products: productsWithDiscount,
       pagination: {
         currentPage: page,
         totalPages,
@@ -210,6 +258,17 @@ export async function POST(req: NextRequest) {
     // Procesar atributos dinámicos
     const attributes = JSON.parse(productData.attributes || "{}");
 
+    // Procesar campos de descuento
+    const hasDiscount = productData.hasDiscount === "true" || productData.hasDiscount === true;
+    const discountPercentage = parseFloat(productData.discountPercentage || "0");
+    const sellPrice = parseFloat(productData.sellPrice || "0");
+
+    // Calcular precio con descuento
+    let discountedPrice = sellPrice;
+    if (hasDiscount && discountPercentage > 0) {
+      discountedPrice = sellPrice * (1 - discountPercentage / 100);
+    }
+
     const newProductCode = await generateUniqueProductCode();
     const barcode = generateArgentineBarcode("EAN13");
 
@@ -255,6 +314,11 @@ export async function POST(req: NextRequest) {
       user: userId,
       store: targetStoreId,
       stock: productData.stock ? parseInt(productData.stock as string) : 0,
+      hasDiscount: hasDiscount,
+      discountPercentage: discountPercentage,
+      discountedPrice: discountedPrice.toFixed(2),
+      discountStartDate: productData.discountStartDate || null,
+      discountEndDate: productData.discountEndDate || null,
     });
 
     return NextResponse.json(
@@ -449,6 +513,17 @@ export async function PUT(req: NextRequest) {
       updatedImages = [...updatedImages, ...uploadedNewImageUrls];
     }
 
+    // Procesar campos de descuento
+    const hasDiscount = productData.hasDiscount === "true" || productData.hasDiscount === true;
+    const discountPercentage = parseFloat(productData.discountPercentage || "0");
+    const sellPriceValue = parseFloat(productData.sellPrice || "0");
+
+    // Calcular precio con descuento
+    let discountedPrice = sellPriceValue;
+    if (hasDiscount && discountPercentage > 0) {
+      discountedPrice = sellPriceValue * (1 - discountPercentage / 100);
+    }
+
     // Preparar los campos a actualizar
     const updateFields: any = {
       name: productData.name,
@@ -461,6 +536,11 @@ export async function PUT(req: NextRequest) {
       images: updatedImages,
       published:
         productData.published === "true" || productData.published === true,
+      hasDiscount: hasDiscount,
+      discountPercentage: discountPercentage,
+      discountedPrice: discountedPrice.toFixed(2),
+      discountStartDate: productData.discountStartDate || null,
+      discountEndDate: productData.discountEndDate || null,
     };
 
     // Agregar imagen principal si se subió una nueva

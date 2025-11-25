@@ -20,6 +20,7 @@ import {
   Plus,
   TrendingUp,
   Calculator,
+  Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatToARS } from "@/lib/utils";
@@ -56,12 +57,14 @@ interface Promotion {
 
 export default function PromotionsPage() {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [globalDiscount, setGlobalDiscount] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const router = useRouter();
 
   useEffect(() => {
     loadPromotions();
+    loadGlobalDiscount();
   }, []);
 
   const loadPromotions = async () => {
@@ -86,6 +89,70 @@ export default function PromotionsPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadGlobalDiscount = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/global-discount", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (data.success && data.globalDiscount) {
+        setGlobalDiscount(data.globalDiscount);
+      }
+    } catch (error) {
+      console.error("Error al cargar descuento global:", error);
+    }
+  };
+
+  const handleToggleGlobalDiscount = async (currentStatus: boolean) => {
+    if (!globalDiscount) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/global-discount", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: globalDiscount.name,
+          description: globalDiscount.description,
+          discountPercentage: globalDiscount.discountPercentage,
+          isActive: !currentStatus,
+          startDate: globalDiscount.startDate,
+          endDate: globalDiscount.endDate,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setGlobalDiscount((prev: any) => ({ ...prev, isActive: !currentStatus }));
+        toast({
+          title: currentStatus ? "Descuento global desactivado" : "Descuento global activado",
+          description: "El estado se actualizó exitosamente",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Error al actualizar",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        title: "Error",
+        description: "Error de conexión",
+        variant: "destructive",
+      });
     }
   };
 
@@ -219,27 +286,50 @@ export default function PromotionsPage() {
             Gestiona tus promociones 2x1 y ofertas especiales
           </p>
         </div>
-        <Button
-          onClick={() => router.push("/promotions/calculator")}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          <Calculator className="h-4 w-4 mr-2" />
-          Nueva Promoción
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={() => router.push("/global-discount")}
+            variant="outline"
+            className="border-purple-600 text-purple-600 hover:bg-purple-50"
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Descuento Global
+          </Button>
+          <Button
+            onClick={() => router.push("/promotions/calculator")}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Calculator className="h-4 w-4 mr-2" />
+            Nueva Promoción
+          </Button>
+        </div>
       </div>
 
       {/* Estadísticas rápidas */}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Promociones</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {promotions.length}
+                  {promotions.length + (globalDiscount ? 1 : 0)}
                 </p>
               </div>
               <Tag className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className={globalDiscount?.isActive ? "border-2 border-purple-300 bg-purple-50" : ""}>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Descuento Global</p>
+                <p className={`text-2xl font-bold ${globalDiscount?.isActive ? "text-purple-600" : "text-gray-400"}`}>
+                  {globalDiscount ? `${globalDiscount.discountPercentage}%` : "-"}
+                </p>
+              </div>
+              <Sparkles className={`h-8 w-8 ${globalDiscount?.isActive ? "text-purple-600" : "text-gray-400"}`} />
             </div>
           </CardContent>
         </Card>
@@ -249,7 +339,7 @@ export default function PromotionsPage() {
               <div>
                 <p className="text-sm text-gray-600">Activas</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {promotions.filter((p) => p.isActive).length}
+                  {promotions.filter((p) => p.isActive).length + (globalDiscount?.isActive ? 1 : 0)}
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-600" />
@@ -262,7 +352,7 @@ export default function PromotionsPage() {
               <div>
                 <p className="text-sm text-gray-600">Inactivas</p>
                 <p className="text-2xl font-bold text-gray-500">
-                  {promotions.filter((p) => !p.isActive).length}
+                  {promotions.filter((p) => !p.isActive).length + (globalDiscount && !globalDiscount.isActive ? 1 : 0)}
                 </p>
               </div>
               <Calendar className="h-8 w-8 text-gray-500" />
@@ -306,6 +396,66 @@ export default function PromotionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {/* Fila especial para descuento global */}
+                {globalDiscount && (
+                  <TableRow className="bg-gradient-to-r from-purple-50 to-blue-50 border-l-4 border-l-purple-600">
+                    <TableCell className="font-bold" colSpan={2}>
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-purple-600" />
+                        <span className="text-purple-900">{globalDiscount.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className="bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 border-purple-300 font-semibold"
+                      >
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        Global
+                      </Badge>
+                    </TableCell>
+                    <TableCell colSpan={2} className="font-semibold">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg text-purple-600">
+                          {globalDiscount.discountPercentage}% OFF
+                        </span>
+                        <span className="text-xs text-gray-500">en todos los productos</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                        Aplica a todos
+                      </span>
+                    </TableCell>
+                    <TableCell>{formatDate(globalDiscount.startDate)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={globalDiscount.isActive}
+                          onCheckedChange={() =>
+                            handleToggleGlobalDiscount(globalDiscount.isActive)
+                          }
+                          className="data-[state=checked]:bg-purple-600"
+                        />
+                        <span className="text-xs text-gray-500">
+                          {globalDiscount.isActive ? "Activo" : "Inactivo"}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => router.push("/global-discount")}
+                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                      >
+                        <Sparkles className="h-4 w-4 mr-1" />
+                        Editar
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+
                 {promotions.map((promotion) => (
                   <TableRow key={promotion._id}>
                     <TableCell className="font-medium">

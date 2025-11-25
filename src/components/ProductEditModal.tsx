@@ -34,6 +34,11 @@ interface Product {
   code: string;
   category: string;
   published: boolean;
+  hasDiscount?: boolean;
+  discountPercentage?: number;
+  discountedPrice?: string;
+  discountStartDate?: string;
+  discountEndDate?: string;
 }
 
 interface ProductEditModalProps {
@@ -60,6 +65,10 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
     category: "",
     margin: 0,
     published: true,
+    hasDiscount: false,
+    discountPercentage: 0,
+    discountStartDate: "",
+    discountEndDate: "",
   });
   const [image, setImage] = useState<string>("");
   const [images, setImages] = useState<string[]>([]);
@@ -73,6 +82,13 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
   // Cargar datos del producto cuando se abre el modal
   useEffect(() => {
     if (product && isOpen) {
+      const discountStart = product.discountStartDate
+        ? new Date(product.discountStartDate).toISOString().split('T')[0]
+        : "";
+      const discountEnd = product.discountEndDate
+        ? new Date(product.discountEndDate).toISOString().split('T')[0]
+        : "";
+
       setFormData({
         name: product.name,
         description: product.description || "",
@@ -82,6 +98,10 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
         category: product.category,
         margin: 0,
         published: product.published,
+        hasDiscount: product.hasDiscount || false,
+        discountPercentage: product.discountPercentage || 0,
+        discountStartDate: discountStart,
+        discountEndDate: discountEnd,
       });
       setImage(product.image || "");
       setImages(product.images || []);
@@ -156,6 +176,10 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
       formDataToSend.append("sellPrice", formData.sellPrice.toString());
       formDataToSend.append("stock", formData.stock.toString());
       formDataToSend.append("category", formData.category);
+      formDataToSend.append("hasDiscount", formData.hasDiscount.toString());
+      formDataToSend.append("discountPercentage", formData.discountPercentage.toString());
+      if (formData.discountStartDate) formDataToSend.append("discountStartDate", formData.discountStartDate);
+      if (formData.discountEndDate) formDataToSend.append("discountEndDate", formData.discountEndDate);
       // Validar y limpiar attributes antes de serializar
       const cleanAttributes = Object.keys(attributes).reduce((acc, key) => {
         const values = attributes[key];
@@ -389,6 +413,88 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Descuentos */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                Descuentos
+              </h3>
+
+              {/* Switch para activar descuento */}
+              <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
+                <Switch
+                  id="hasDiscount-edit"
+                  checked={formData.hasDiscount}
+                  onCheckedChange={(checked) => handleInputChange("hasDiscount", checked)}
+                />
+                <Label htmlFor="hasDiscount-edit" className="text-sm font-medium cursor-pointer">
+                  Activar descuento en este producto
+                </Label>
+              </div>
+
+              {/* Campos de descuento (solo si está activado) */}
+              {formData.hasDiscount && (
+                <div className="space-y-4 p-4 border rounded-lg bg-blue-50">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Porcentaje de descuento */}
+                    <div>
+                      <Label htmlFor="discountPercentage-edit">Descuento (%)</Label>
+                      <Input
+                        id="discountPercentage-edit"
+                        type="number"
+                        value={formData.discountPercentage}
+                        onChange={(e) => handleInputChange("discountPercentage", Number(e.target.value))}
+                        placeholder="Ej: 10"
+                        min="0"
+                        max="100"
+                        step="1"
+                      />
+                    </div>
+
+                    {/* Fecha de inicio */}
+                    <div>
+                      <Label htmlFor="discountStartDate-edit">Fecha de Inicio</Label>
+                      <Input
+                        id="discountStartDate-edit"
+                        type="date"
+                        value={formData.discountStartDate}
+                        onChange={(e) => handleInputChange("discountStartDate", e.target.value)}
+                      />
+                    </div>
+
+                    {/* Fecha de fin */}
+                    <div>
+                      <Label htmlFor="discountEndDate-edit">Fecha de Fin</Label>
+                      <Input
+                        id="discountEndDate-edit"
+                        type="date"
+                        value={formData.discountEndDate}
+                        onChange={(e) => handleInputChange("discountEndDate", e.target.value)}
+                        min={formData.discountStartDate}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Vista previa del precio con descuento */}
+                  {formData.discountPercentage > 0 && formData.sellPrice > 0 && (
+                    <div className="p-3 bg-white rounded-lg border border-blue-200">
+                      <p className="text-sm text-gray-600 mb-1">Vista previa:</p>
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg text-gray-400 line-through">
+                          ${formData.sellPrice.toFixed(2)}
+                        </span>
+                        <span className="text-2xl font-bold text-blue-600">
+                          ${(formData.sellPrice * (1 - formData.discountPercentage / 100)).toFixed(2)}
+                        </span>
+                        <span className="px-2 py-1 bg-red-500 text-white text-xs font-bold rounded">
+                          -{formData.discountPercentage}%
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Imagen Principal */}

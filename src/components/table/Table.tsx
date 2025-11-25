@@ -29,6 +29,11 @@ interface Product {
   category: string;
   user: string;
   published: boolean;
+  hasDiscount?: boolean;
+  discountPercentage?: number;
+  discountedPrice?: string;
+  discountStartDate?: string;
+  discountEndDate?: string;
 }
 
 interface EditingCell {

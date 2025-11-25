@@ -31,6 +31,12 @@ interface Product {
   barcode: string;
   user: string;
   published: boolean;
+  hasDiscount?: boolean;
+  discountPercentage?: number;
+  discountedPrice?: string;
+  discountStartDate?: string;
+  discountEndDate?: string;
+  isGlobalDiscount?: boolean;
 }
 
 interface SaleProduct {

@@ -12,6 +12,7 @@ import {
   Barcode,
   MoreVertical,
   EyeOff,
+  Percent,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -26,6 +27,7 @@ import { AttributesModal } from "@/components/AttributesModal";
 import { ProductEditModal } from "@/components/ProductEditModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { BarcodeModal } from "@/components/BarcodeModal";
+import { DiscountModal } from "@/components/DiscountModal";
 import { useToast } from "@/hooks/use-toast";
 
 interface Product {
@@ -45,6 +47,11 @@ interface Product {
   category: string;
   user: string;
   published: boolean;
+  hasDiscount?: boolean;
+  discountPercentage?: number;
+  discountedPrice?: string;
+  discountStartDate?: string;
+  discountEndDate?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -71,6 +78,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
+  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [localImages, setLocalImages] = useState<string[]>([]);
@@ -185,6 +193,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
     setIsDropdownOpen(false);
   }, []);
 
+  const handleDiscountClick = useCallback(() => {
+    setIsDiscountModalOpen(true);
+    setIsDropdownOpen(false);
+  }, []);
+
   const handleConfirmDelete = async () => {
     setIsDeleting(true);
     try {
@@ -285,9 +298,17 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   {product.name}
                 </CardTitle>
                 <p className="text-sm text-gray-500">{product.code}</p>
-                <Badge variant="secondary" className="mt-1">
-                  {product.category}
-                </Badge>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <Badge variant="secondary">
+                    {product.category}
+                  </Badge>
+                  {product.hasDiscount && product.discountPercentage && product.discountPercentage > 0 && (
+                    <Badge className="bg-red-500 text-white hover:bg-red-600">
+                      <Percent className="h-3 w-3 mr-1" />
+                      -{product.discountPercentage}% OFF
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -313,7 +334,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent align="end" className="w-52">
                   <DropdownMenuItem onClick={handleImageClick}>
                     <Eye className="h-4 w-4 mr-2" />
                     Ver imágenes
@@ -325,6 +346,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   <DropdownMenuItem onClick={handleBarcodeClick}>
                     <Barcode className="h-4 w-4 mr-2" />
                     Ver código de barras
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleDiscountClick}
+                    className={product.hasDiscount ? "text-blue-600 focus:text-blue-600" : ""}
+                  >
+                    <Percent className="h-4 w-4 mr-2" />
+                    {product.hasDiscount ? "Editar descuento" : "Agregar descuento"}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -424,9 +452,25 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
             <div>
               <p className="text-sm text-gray-500">Precio de Venta</p>
-              <p className="font-semibold">
-                {formatToARS(parseFloat(product.sellPrice))}
-              </p>
+              {product.hasDiscount && product.discountPercentage && product.discountPercentage > 0 ? (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-gray-400 line-through text-sm">
+                      {formatToARS(parseFloat(product.sellPrice))}
+                    </p>
+                    <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs font-bold rounded">
+                      -{product.discountPercentage}%
+                    </span>
+                  </div>
+                  <p className="font-bold text-blue-600">
+                    {formatToARS(parseFloat(product.discountedPrice || product.sellPrice))}
+                  </p>
+                </div>
+              ) : (
+                <p className="font-semibold">
+                  {formatToARS(parseFloat(product.sellPrice))}
+                </p>
+              )}
             </div>
             <div>
               <p className="text-sm text-gray-500">Margen</p>
@@ -509,6 +553,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
         onConfirm={handleConfirmDelete}
         productName={product.name}
         isLoading={isDeleting}
+      />
+
+      <DiscountModal
+        product={product}
+        isOpen={isDiscountModalOpen}
+        onClose={() => setIsDiscountModalOpen(false)}
+        onRefresh={onRefresh}
       />
 
       <BarcodeModal

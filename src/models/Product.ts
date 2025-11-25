@@ -17,6 +17,12 @@ export interface IProduct extends Document {
   store: string; // Tienda a la que pertenece el producto
   category: string;
   published: boolean; // Control de visibilidad pública
+  // Campos de descuento
+  hasDiscount: boolean; // Si el producto tiene descuento activo
+  discountPercentage: number; // Porcentaje de descuento (ej: 10 = 10%)
+  discountedPrice: string; // Precio con descuento aplicado
+  discountStartDate?: Date; // Fecha de inicio del descuento
+  discountEndDate?: Date; // Fecha de fin del descuento
 }
 
 const ProductSchema: Schema<IProduct> = new Schema(
@@ -77,6 +83,26 @@ const ProductSchema: Schema<IProduct> = new Schema(
       type: Boolean,
       default: true,
       required: true,
+    },
+    hasDiscount: {
+      type: Boolean,
+      default: false,
+    },
+    discountPercentage: {
+      type: Number,
+      default: 0,
+      min: [0, "El descuento no puede ser negativo"],
+      max: [100, "El descuento no puede ser mayor a 100%"],
+    },
+    discountedPrice: {
+      type: String,
+      default: "0",
+    },
+    discountStartDate: {
+      type: Date,
+    },
+    discountEndDate: {
+      type: Date,
     },
   },
   { timestamps: true }
