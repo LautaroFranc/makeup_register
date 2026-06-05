@@ -58,7 +58,7 @@ export async function GET(
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .select("name description image images sellPrice barcode createdAt");
+      .select("name description image images sellPrice barcode createdAt hasDiscount discountPercentage discountedPrice discountStartDate discountEndDate");
 
     // Contar total de productos publicados en esta categoría
     const totalProducts = await Product.countDocuments({
@@ -86,6 +86,11 @@ export async function GET(
         image: product.image,
         images: product.images,
         sellPrice: product.sellPrice,
+        hasDiscount: product.hasDiscount,
+        discountPercentage: product.discountPercentage,
+        discountedPrice: product.discountedPrice,
+        discountStartDate: product.discountStartDate,
+        discountEndDate: product.discountEndDate,
         barcode: product.barcode,
       })),
       pagination: {

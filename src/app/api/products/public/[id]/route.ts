@@ -21,7 +21,7 @@ export async function GET(
 
     // Buscar el producto por ID
     const product = await Product.findById(productId).select(
-      "name description image images sellPrice category barcode stock published user"
+      "name description image images sellPrice category barcode stock published user hasDiscount discountPercentage discountedPrice discountStartDate discountEndDate"
     );
 
     if (!product) {
@@ -57,6 +57,12 @@ export async function GET(
       image: product.image,
       images: product.images,
       category: product.category,
+      sellPrice: product.sellPrice,
+      hasDiscount: product.hasDiscount,
+      discountPercentage: product.discountPercentage,
+      discountedPrice: product.discountedPrice,
+      discountStartDate: product.discountStartDate,
+      discountEndDate: product.discountEndDate,
       stock: product.stock,
       published: product.published,
       owner: {
