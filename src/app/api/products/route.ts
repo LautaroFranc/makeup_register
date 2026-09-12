@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import Product from "@/models/Product"; // Asegúrate de que esta ruta sea correcta
 import connectDB from "@/config/db"; // Ruta de conexión a la base de datos
 import cloudinary from "@/config/cloudinary";
@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
       .skip(skip)
       .limit(limit)
       .select(
-        "name description image images sellPrice category barcode stock published hasDiscount discountPercentage discountedPrice discountStartDate discountEndDate"
+        "name description image images attributes sellPrice category barcode stock published hasDiscount discountPercentage discountedPrice discountStartDate discountEndDate"
       );
 
     // Obtener la tienda activa del usuario para aplicar descuento global

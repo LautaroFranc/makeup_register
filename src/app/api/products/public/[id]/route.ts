@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import Product from "@/models/Product";
 import Users from "@/models/Users";
 import connectDB from "@/config/db";
@@ -21,7 +21,7 @@ export async function GET(
 
     // Buscar el producto por ID
     const product = await Product.findById(productId).select(
-      "name description image images sellPrice category barcode stock published user hasDiscount discountPercentage discountedPrice discountStartDate discountEndDate"
+      "name description image images attributes sellPrice category barcode stock published user hasDiscount discountPercentage discountedPrice discountStartDate discountEndDate"
     );
 
     if (!product) {
@@ -56,6 +56,7 @@ export async function GET(
       description: product.description,
       image: product.image,
       images: product.images,
+      attributes: product.attributes,
       category: product.category,
       sellPrice: product.sellPrice,
       hasDiscount: product.hasDiscount,
