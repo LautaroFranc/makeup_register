@@ -158,7 +158,7 @@ export const PublicCheckout: React.FC<PublicCheckoutProps> = ({
                     onClick={() =>
                       window.open(
                         `https://instagram.com/${paymentMethods.directSale.instagram?.replace("@", "")}`,
-                        "_blank"
+                        "_blank",
                       )
                     }
                   >
@@ -185,7 +185,7 @@ export const PublicCheckout: React.FC<PublicCheckoutProps> = ({
                     onClick={() =>
                       window.open(
                         `https://t.me/${paymentMethods.directSale.telegram?.replace("@", "")}`,
-                        "_blank"
+                        "_blank",
                       )
                     }
                   >
@@ -283,7 +283,7 @@ export const PublicCheckout: React.FC<PublicCheckoutProps> = ({
                   onClick={() =>
                     copyToClipboard(
                       paymentMethods.bankTransfer!.accountHolder!,
-                      "Titular"
+                      "Titular",
                     )
                   }
                 >
@@ -347,7 +347,7 @@ export const PublicCheckout: React.FC<PublicCheckoutProps> = ({
                   onClick={() =>
                     copyToClipboard(
                       paymentMethods.bankTransfer!.alias!,
-                      "Alias"
+                      "Alias",
                     )
                   }
                 >

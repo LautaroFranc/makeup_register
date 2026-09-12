@@ -10,7 +10,7 @@ connectDB();
 // POST - Registrar venta pública usando el slug de la tienda o del usuario
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
     const { slug } = await params;
@@ -18,7 +18,7 @@ export async function POST(
     if (!slug) {
       return NextResponse.json(
         { success: false, message: "El slug es requerido" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -37,7 +37,7 @@ export async function POST(
       if (!user) {
         return NextResponse.json(
           { success: false, message: "Tienda o usuario no encontrado" },
-          { status: 404 }
+          { status: 404 },
         );
       }
       userId = (user._id as any).toString();
@@ -71,7 +71,7 @@ export async function POST(
           message:
             "Debe proporcionar al menos un producto para registrar la venta",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -160,7 +160,7 @@ export async function POST(
         const newStock = product.stock - quantity;
         await Product.updateOne(
           { _id: productId },
-          { $set: { stock: newStock } }
+          { $set: { stock: newStock } },
         );
 
         // Crear el registro de la venta
@@ -206,7 +206,7 @@ export async function POST(
           message: "No se pudo registrar ninguna venta",
           errors: errors[0],
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -219,7 +219,7 @@ export async function POST(
           products: productsUpdated,
           errors,
         },
-        { status: 207 } // Multi-Status
+        { status: 207 }, // Multi-Status
       );
     }
 
@@ -233,7 +233,7 @@ export async function POST(
         sales: successfulSales,
         products: productsUpdated,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: any) {
     console.error("Error al registrar venta pública:", error);
@@ -245,21 +245,21 @@ export async function POST(
           success: false,
           message: "ID de producto inválido. El formato del ID no es correcto.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Manejar errores de validación de Mongoose
     if (error.name === "ValidationError") {
       const validationErrors = Object.values(error.errors).map(
-        (err: any) => err.message
+        (err: any) => err.message,
       );
       return NextResponse.json(
         {
           success: false,
           message: "Error de validación: " + validationErrors.join(", "),
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -269,7 +269,7 @@ export async function POST(
         message: "Error al registrar la venta. Por favor intenta nuevamente.",
         details: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
