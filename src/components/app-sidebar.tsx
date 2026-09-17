@@ -88,6 +88,11 @@ const items = [
     ],
   },
   {
+    title: "Clientes & Leads",
+    url: "/leads",
+    icon: User,
+  },
+  {
     title: "Tiendas",
     url: "/stores",
     icon: Store,
