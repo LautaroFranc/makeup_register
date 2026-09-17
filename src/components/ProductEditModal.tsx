@@ -289,7 +289,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
           buyPrice: formData.buyPrice.toString(),
           sellPrice: formData.sellPrice.toString(),
           wholesalePrice: formData.wholesalePrice.toString(),
-          stock: formData.stock,
+          stock: Number(formData.stock) || 0,
           category: formData.category,
           images: images,
           attributes: attributes,
@@ -385,7 +385,6 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
                       id="name"
                       value={formData.name}
                       onChange={(e) => handleInputChange("name", e.target.value)}
-                      required={step === 4}
                     />
                   </div>
                   <div className="space-y-2">
@@ -426,7 +425,6 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
                       onChange={(e) => handleInputChange("stock", e.target.value === "" ? "" : Number(e.target.value))}
                       className="w-1/3"
                       min="0"
-                      required={step === 4}
                     />
                   </div>
 

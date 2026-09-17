@@ -196,7 +196,6 @@ const ProductForm = () => {
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Ej. Base de Maquillaje Líquida"
                         className="h-12"
-                        required={step === 4} // Solo requerido al intentar guardar
                       />
                     </div>
                     <div className="space-y-2">
@@ -233,7 +232,6 @@ const ProductForm = () => {
                         placeholder="0"
                         className="w-1/3"
                         min="0"
-                        required={step === 4}
                       />
                     </div>
 
