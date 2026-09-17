@@ -40,6 +40,7 @@ interface Product {
   };
   buyPrice: string;
   sellPrice: string;
+  wholesalePrice?: string;
   stock: number;
   code: string;
   barcode: string;
@@ -422,6 +423,11 @@ const ProductRow: React.FC<ProductRowProps> = ({
       <TableCell>
         <span className="font-medium">
           {formatToARS(parseFloat(product.sellPrice))}
+        </span>
+      </TableCell>
+      <TableCell>
+        <span className="font-medium text-purple-600">
+          {formatToARS(parseFloat(product.wholesalePrice || "0"))}
         </span>
       </TableCell>
       <TableCell>

@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { X, Save, Upload, Loader2 } from "lucide-react";
+import { X, Save, Upload, Loader2, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { CategorySelector } from "@/components/CategorySelect";
@@ -30,6 +30,7 @@ interface Product {
   };
   buyPrice: string;
   sellPrice: string;
+  wholesalePrice?: string;
   stock: number;
   code: string;
   category: string;
@@ -56,14 +57,40 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
   onSave,
   onRefresh,
 }) => {
-  const [formData, setFormData] = useState({
+  const [step, setStep] = useState(1);
+  const totalSteps = 4;
+  const steps = [
+    { num: 1, title: "Básicos" },
+    { num: 2, title: "Precios" },
+    { num: 3, title: "Detalles" },
+    { num: 4, title: "Revisión" }
+  ];
+
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string;
+    buyPrice: number;
+    sellPrice: number;
+    wholesalePrice: number;
+    stock: number | string;
+    category: string;
+    margin: number | string;
+    wholesaleMargin: number | string;
+    published: boolean;
+    hasDiscount: boolean;
+    discountPercentage: number | string;
+    discountStartDate: string;
+    discountEndDate: string;
+  }>({
     name: "",
     description: "",
     buyPrice: 0,
     sellPrice: 0,
+    wholesalePrice: 0,
     stock: 0,
     category: "",
     margin: 0,
+    wholesaleMargin: 0,
     published: true,
     hasDiscount: false,
     discountPercentage: 0,
@@ -82,6 +109,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
   // Cargar datos del producto cuando se abre el modal
   useEffect(() => {
     if (product && isOpen) {
+      setStep(1); // Reset step on open
       const discountStart = product.discountStartDate
         ? new Date(product.discountStartDate).toISOString().split('T')[0]
         : "";
@@ -94,9 +122,11 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
         description: product.description || "",
         buyPrice: parseFloat(product.buyPrice) || 0,
         sellPrice: parseFloat(product.sellPrice) || 0,
+        wholesalePrice: parseFloat(product.wholesalePrice || "0"),
         stock: product.stock,
         category: product.category,
         margin: 0,
+        wholesaleMargin: 0,
         published: product.published,
         hasDiscount: product.hasDiscount || false,
         discountPercentage: product.discountPercentage || 0,
@@ -119,15 +149,22 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
         ((formData.sellPrice - formData.buyPrice) / formData.buyPrice) * 100;
       setFormData((prev) => ({ ...prev, margin: Number(margin.toFixed(2)) }));
     }
-  }, [formData.buyPrice, formData.sellPrice]);
+    if (formData.buyPrice > 0 && formData.wholesalePrice > 0) {
+      const wholesaleMargin =
+        ((formData.wholesalePrice - formData.buyPrice) / formData.buyPrice) * 100;
+      setFormData((prev) => ({ ...prev, wholesaleMargin: Number(wholesaleMargin.toFixed(2)) }));
+    }
+  }, [formData.buyPrice, formData.sellPrice, formData.wholesalePrice]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleMarginChange = (newMargin: number) => {
+  const handleMarginChange = (newMargin: number | string) => {
     setFormData((prev) => {
-      const newSalePrice = prev.buyPrice * (1 + newMargin / 100);
+      if (newMargin === "") return { ...prev, margin: "" };
+      const numericMargin = Number(newMargin);
+      const newSalePrice = prev.buyPrice * (1 + numericMargin / 100);
       return {
         ...prev,
         margin: newMargin,
@@ -138,11 +175,35 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
 
   const handleSalePriceChange = (newSalePrice: number) => {
     setFormData((prev) => {
-      const newMargin = ((newSalePrice - prev.buyPrice) / prev.buyPrice) * 100;
+      const newMargin = prev.buyPrice ? ((newSalePrice - prev.buyPrice) / prev.buyPrice) * 100 : 0;
       return {
         ...prev,
         sellPrice: newSalePrice,
         margin: Number(newMargin.toFixed(2)),
+      };
+    });
+  };
+
+  const handleWholesaleMarginChange = (newMargin: number | string) => {
+    setFormData((prev) => {
+      if (newMargin === "") return { ...prev, wholesaleMargin: "" };
+      const numericMargin = Number(newMargin);
+      const newWholesalePrice = prev.buyPrice * (1 + numericMargin / 100);
+      return {
+        ...prev,
+        wholesaleMargin: newMargin,
+        wholesalePrice: Number(newWholesalePrice.toFixed(2)),
+      };
+    });
+  };
+
+  const handleWholesalePriceChange = (newWholesalePrice: number) => {
+    setFormData((prev) => {
+      const newMargin = prev.buyPrice ? ((newWholesalePrice - prev.buyPrice) / prev.buyPrice) * 100 : 0;
+      return {
+        ...prev,
+        wholesalePrice: newWholesalePrice,
+        wholesaleMargin: Number(newMargin.toFixed(2)),
       };
     });
   };
@@ -157,9 +218,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
   };
 
   const handleRemoveImage = (imageUrl: string) => {
-    // Agregar a la lista de imágenes eliminadas
     setRemovedImages((prev) => [...prev, imageUrl]);
-    // Remover de la lista de imágenes actuales
     setImages((prev) => prev.filter((img) => img !== imageUrl));
   };
 
@@ -168,19 +227,20 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
     setLoading(true);
 
     try {
-      // Crear FormData para enviar los datos
       const formDataToSend = new FormData();
       formDataToSend.append("name", formData.name);
       formDataToSend.append("description", formData.description);
       formDataToSend.append("buyPrice", formData.buyPrice.toString());
       formDataToSend.append("sellPrice", formData.sellPrice.toString());
-      formDataToSend.append("stock", formData.stock.toString());
+      formDataToSend.append("wholesalePrice", formData.wholesalePrice.toString());
+      formDataToSend.append("stock", formData.stock === "" ? "0" : formData.stock.toString());
       formDataToSend.append("category", formData.category);
+      formDataToSend.append("published", formData.published.toString());
       formDataToSend.append("hasDiscount", formData.hasDiscount.toString());
-      formDataToSend.append("discountPercentage", formData.discountPercentage.toString());
+      formDataToSend.append("discountPercentage", formData.discountPercentage === "" ? "0" : formData.discountPercentage.toString());
       if (formData.discountStartDate) formDataToSend.append("discountStartDate", formData.discountStartDate);
       if (formData.discountEndDate) formDataToSend.append("discountEndDate", formData.discountEndDate);
-      // Validar y limpiar attributes antes de serializar
+      
       const cleanAttributes = Object.keys(attributes).reduce((acc, key) => {
         const values = attributes[key];
         if (Array.isArray(values) && values.length > 0) {
@@ -192,37 +252,23 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
       }, {} as { [key: string]: string[] });
 
       try {
-        const attributesJson = JSON.stringify(cleanAttributes);
-        console.log("Attributes a enviar:", cleanAttributes);
-        console.log("JSON generado:", attributesJson);
-        formDataToSend.append("attributes", attributesJson);
+        formDataToSend.append("attributes", JSON.stringify(cleanAttributes));
       } catch (error) {
-        console.error("Error serializando attributes:", error);
         formDataToSend.append("attributes", JSON.stringify({}));
       }
 
-      // Agregar imágenes eliminadas
       if (removedImages.length > 0) {
         formDataToSend.append("removedImages", JSON.stringify(removedImages));
       }
 
-      // Agregar imagen principal si la hay
       if (uploadedMainImage) {
         formDataToSend.append("image", uploadedMainImage);
       }
 
-      // Agregar nuevas imágenes si las hay
       uploadedImages.forEach((image) => {
         formDataToSend.append("images", image);
       });
 
-      // Debug: mostrar todos los datos del FormData
-      console.log("FormData completo:");
-      for (let [key, value] of formDataToSend.entries()) {
-        console.log(`${key}:`, value);
-      }
-
-      // Llamada a la API para actualizar el producto
       const token = localStorage.getItem("token");
       const response = await fetch(`/api/products?id=${product!._id}`, {
         method: "PUT",
@@ -235,7 +281,6 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
       const result = await response.json();
 
       if (result.success || response.ok) {
-        // Notificar al componente padre sobre la actualización exitosa
         const updatedProduct = {
           ...product!,
           name: formData.name,
@@ -243,6 +288,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
           image: image,
           buyPrice: formData.buyPrice.toString(),
           sellPrice: formData.sellPrice.toString(),
+          wholesalePrice: formData.wholesalePrice.toString(),
           stock: formData.stock,
           category: formData.category,
           images: images,
@@ -251,28 +297,19 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
         };
 
         onSave(updatedProduct);
-
         toast({
           description: "Producto actualizado exitosamente!",
           variant: "default",
         });
 
-        // Recargar datos de la tabla
-        if (onRefresh) {
-          onRefresh();
-        }
-
-        // Solo cerrar el modal después de la actualización exitosa
+        if (onRefresh) onRefresh();
         onClose();
       } else {
         throw new Error(result.error || "Error al actualizar el producto");
       }
     } catch (error) {
-      console.error("Error al actualizar el producto:", error);
       toast({
-        description: `Error al actualizar el producto: ${
-          error instanceof Error ? error.message : "Error desconocido"
-        }`,
+        description: `Error al actualizar el producto: ${error instanceof Error ? error.message : "Error desconocido"}`,
         variant: "destructive",
       });
     } finally {
@@ -285,7 +322,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className="max-w-4xl max-h-[85vh] overflow-hidden relative"
+        className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0"
         style={{
           position: "fixed",
           top: "50%",
@@ -294,180 +331,233 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
           zIndex: 50,
         }}
       >
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>Editar Producto: {product.name}</span>
+        <DialogHeader className="px-6 py-4 border-b shrink-0 bg-white">
+          <DialogTitle className="text-xl">
+            Editar: {product.name}
           </DialogTitle>
         </DialogHeader>
 
-        {/* Overlay de loading */}
         {loading && (
           <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center">
             <div className="flex flex-col items-center space-y-4">
               <Loader2 className="h-12 w-12 text-blue-500 animate-spin" />
-              <p className="text-lg font-medium text-gray-700">
-                Guardando cambios...
-              </p>
-              <p className="text-sm text-gray-500">
-                Por favor espera mientras se actualiza el producto
-              </p>
+              <p className="text-lg font-medium text-gray-700">Guardando cambios...</p>
             </div>
           </div>
         )}
 
-        <div className="overflow-y-auto max-h-[calc(85vh-120px)]">
-          <form onSubmit={handleSubmit} className="space-y-6 p-1">
-            {/* Información Básica */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
-                Información Básica
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Nombre */}
-                <div className="md:col-span-2">
-                  <Label htmlFor="name">Nombre del Producto</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange("name", e.target.value)}
-                    placeholder="Nombre del producto"
-                    required
-                  />
+        {/* Progress Bar / Steps (Sticky) */}
+        <div className="px-6 py-4 shrink-0 bg-gray-50/80 border-b">
+          <div className="flex items-center justify-between relative max-w-2xl mx-auto">
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-gray-200 -z-10 rounded"></div>
+            <div 
+              className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-blue-600 -z-10 rounded transition-all duration-300"
+              style={{ width: `${((step - 1) / (totalSteps - 1)) * 100}%` }}
+            ></div>
+            
+            {steps.map((s) => (
+              <div key={s.num} className="flex flex-col items-center gap-2 px-2" style={{ backgroundColor: 'transparent' }}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold border-2 transition-colors bg-white
+                  ${step === s.num ? 'border-blue-600 bg-blue-600 text-white' : 
+                    step > s.num ? 'border-blue-600 text-blue-600' : 'border-gray-300 text-gray-400'}`}>
+                  {step > s.num ? <Check className="w-5 h-5" /> : s.num}
                 </div>
-                {/* Descripción */}
-                <div className="md:col-span-2">
-                  <Label htmlFor="description">Descripción</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) =>
-                      handleInputChange("description", e.target.value)
-                    }
-                    placeholder="Descripción del producto"
-                    rows={3}
-                  />
-                </div>
-                {/* Categoría */}
-                <div>
-                  <Label htmlFor="category">Categoría</Label>
-                  <div className="relative z-[180]">
-                    <CategorySelector
-                      value={formData.category}
-                      onChange={(value) => handleInputChange("category", value)}
-                      inModal={true}
+                <span className={`text-xs font-medium ${step >= s.num ? 'text-gray-900' : 'text-gray-400'}`}>
+                  {s.title}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Form Content - Scrollable */}
+        <div className="overflow-y-auto flex-1 p-6">
+          <form id="edit-product-form" onSubmit={handleSubmit} className="flex flex-col h-full">
+            
+            {/* ================= STEP 1 ================= */}
+            {step === 1 && (
+              <div className="space-y-6 animate-in fade-in">
+                <h3 className="text-lg font-semibold border-b pb-2">Información Básica</h3>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nombre del Producto</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => handleInputChange("name", e.target.value)}
+                      required={step === 4}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Categoría</Label>
+                    <div className="relative z-[180]">
+                      <CategorySelector
+                        value={formData.category}
+                        onChange={(value) => handleInputChange("category", value)}
+                        inModal={true}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Descripción</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => handleInputChange("description", e.target.value)}
+                      rows={3}
                     />
                   </div>
                 </div>
-                {/* Stock */}
-                <div>
-                  <Label htmlFor="stock">Stock</Label>
-                  <Input
-                    id="stock"
-                    type="number"
-                    value={formData.stock}
-                    onChange={(e) =>
-                      handleInputChange("stock", Number(e.target.value))
-                    }
-                    placeholder="Cantidad en stock"
-                    required
-                    min="0"
-                    step="1"
-                  />
-                </div>
               </div>
-            </div>
+            )}
 
-            {/* Precios */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
-                Precios y Margen
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Precio de compra */}
-                <div>
-                  <CurrencyInput
-                    label="Precio de Compra ($)"
-                    value={formData.buyPrice}
-                    onChange={(value) => handleInputChange("buyPrice", value)}
-                  />
-                </div>
-                {/* Margen */}
-                <div>
-                  <Label htmlFor="margin">Margen (%)</Label>
-                  <Input
-                    id="margin"
-                    type="number"
-                    value={formData.margin}
-                    onChange={(e) => handleMarginChange(Number(e.target.value))}
-                    placeholder="Margen (%)"
-                    min="0"
-                    step="10"
-                  />
-                </div>
-                {/* Precio de venta */}
-                <div>
-                  <CurrencyInput
-                    label="Precio de Venta ($)"
-                    value={formData.sellPrice}
-                    onChange={(value) => handleSalePriceChange(value)}
-                  />
-                </div>
-              </div>
-            </div>
+            {/* ================= STEP 2 ================= */}
+            {step === 2 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Precios e Inventario</h3>
+                
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="stock">Stock Actual</Label>
+                    <Input
+                      id="stock"
+                      type="number"
+                      value={formData.stock}
+                      onChange={(e) => handleInputChange("stock", e.target.value === "" ? "" : Number(e.target.value))}
+                      className="w-1/3"
+                      min="0"
+                      required={step === 4}
+                    />
+                  </div>
 
-            {/* Descuentos */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
-                Descuentos
-              </h3>
-
-              {/* Switch para activar descuento */}
-              <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
-                <Switch
-                  id="hasDiscount-edit"
-                  checked={formData.hasDiscount}
-                  onCheckedChange={(checked) => handleInputChange("hasDiscount", checked)}
-                />
-                <Label htmlFor="hasDiscount-edit" className="text-sm font-medium cursor-pointer">
-                  Activar descuento en este producto
-                </Label>
-              </div>
-
-              {/* Campos de descuento (solo si está activado) */}
-              {formData.hasDiscount && (
-                <div className="space-y-4 p-4 border rounded-lg bg-blue-50">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Porcentaje de descuento */}
                     <div>
-                      <Label htmlFor="discountPercentage-edit">Descuento (%)</Label>
-                      <Input
-                        id="discountPercentage-edit"
-                        type="number"
-                        value={formData.discountPercentage}
-                        onChange={(e) => handleInputChange("discountPercentage", Number(e.target.value))}
-                        placeholder="Ej: 10"
-                        min="0"
-                        max="100"
-                        step="1"
+                      <CurrencyInput
+                        label="Precio de Compra ($)"
+                        value={formData.buyPrice}
+                        onChange={(value) => handleInputChange("buyPrice", value)}
                       />
                     </div>
-
-                    {/* Fecha de inicio */}
-                    <div>
-                      <Label htmlFor="discountStartDate-edit">Fecha de Inicio</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="margin">Margen Minorista (%)</Label>
                       <Input
-                        id="discountStartDate-edit"
+                        id="margin"
+                        type="number"
+                        value={formData.margin}
+                        onChange={(e) => handleMarginChange(e.target.value === "" ? "" : Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <CurrencyInput
+                        label="Precio de Venta ($)"
+                        value={formData.sellPrice}
+                        onChange={(value) => handleSalePriceChange(value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-dashed">
+                    <h4 className="font-semibold text-gray-700 mb-4">Precios Mayoristas</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="md:col-start-2 space-y-2">
+                        <Label htmlFor="wholesaleMargin">Margen Mayorista (%)</Label>
+                        <Input
+                          id="wholesaleMargin"
+                          type="number"
+                          value={formData.wholesaleMargin}
+                          onChange={(e) => handleWholesaleMarginChange(e.target.value === "" ? "" : Number(e.target.value))}
+                        />
+                      </div>
+                      <div>
+                        <CurrencyInput
+                          label="Precio Mayorista ($)"
+                          value={formData.wholesalePrice}
+                          onChange={(value) => handleWholesalePriceChange(value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ================= STEP 3 ================= */}
+            {step === 3 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                
+                <h3 className="text-lg font-semibold border-b pb-2">Imagen Principal</h3>
+                <div className="space-y-3">
+                  {image && (
+                    <div className="relative inline-block">
+                      <img src={image} alt="Imagen principal" className="w-32 h-32 object-cover rounded-lg border" />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                        onClick={handleRemoveMainImage}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleMainImageChange(e.target.files?.[0] || null)}
+                      className="max-w-xs"
+                    />
+                    {uploadedMainImage && <span className="text-sm text-green-600">✓ Seleccionada</span>}
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-semibold border-b pb-2 pt-4">Galería Extra</h3>
+                <ImageUploadSquare
+                  images={images}
+                  onImagesChange={setImages}
+                  uploadedImages={uploadedImages}
+                  onUploadedImagesChange={setUploadedImages}
+                  onRemoveImage={handleRemoveImage}
+                />
+
+                <h3 className="text-lg font-semibold border-b pb-2 pt-4">Atributos y Promociones</h3>
+                <DynamicAttributes
+                  attributes={attributes}
+                  onAttributesChange={setAttributes}
+                />
+
+                <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg mt-4">
+                  <Switch
+                    id="hasDiscount-edit"
+                    checked={formData.hasDiscount}
+                    onCheckedChange={(checked) => handleInputChange("hasDiscount", checked)}
+                  />
+                  <Label htmlFor="hasDiscount-edit" className="text-sm font-medium">Activar descuento</Label>
+                </div>
+
+                {formData.hasDiscount && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 border rounded-lg bg-blue-50">
+                    <div>
+                      <Label>Descuento (%)</Label>
+                      <Input
+                        type="number"
+                        value={formData.discountPercentage}
+                        onChange={(e) => handleInputChange("discountPercentage", e.target.value === "" ? "" : Number(e.target.value))}
+                        min="0" max="100"
+                      />
+                    </div>
+                    <div>
+                      <Label>Fecha de Inicio</Label>
+                      <Input
                         type="date"
                         value={formData.discountStartDate}
                         onChange={(e) => handleInputChange("discountStartDate", e.target.value)}
                       />
                     </div>
-
-                    {/* Fecha de fin */}
                     <div>
-                      <Label htmlFor="discountEndDate-edit">Fecha de Fin</Label>
+                      <Label>Fecha de Fin</Label>
                       <Input
-                        id="discountEndDate-edit"
                         type="date"
                         value={formData.discountEndDate}
                         onChange={(e) => handleInputChange("discountEndDate", e.target.value)}
@@ -475,157 +565,59 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
                       />
                     </div>
                   </div>
+                )}
+              </div>
+            )}
 
-                  {/* Vista previa del precio con descuento */}
-                  {formData.discountPercentage > 0 && formData.sellPrice > 0 && (
-                    <div className="p-3 bg-white rounded-lg border border-blue-200">
-                      <p className="text-sm text-gray-600 mb-1">Vista previa:</p>
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg text-gray-400 line-through">
-                          ${formData.sellPrice.toFixed(2)}
-                        </span>
-                        <span className="text-2xl font-bold text-blue-600">
-                          ${(formData.sellPrice * (1 - formData.discountPercentage / 100)).toFixed(2)}
-                        </span>
-                        <span className="px-2 py-1 bg-red-500 text-white text-xs font-bold rounded">
-                          -{formData.discountPercentage}%
-                        </span>
-                      </div>
-                    </div>
-                  )}
+            {/* ================= STEP 4 ================= */}
+            {step === 4 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                <h3 className="text-lg font-semibold text-center border-b pb-2">Revisión Final</h3>
+                
+                <div className="text-center p-6 bg-blue-50 text-blue-800 rounded-lg border border-blue-200">
+                  <Save className="w-12 h-12 mx-auto mb-4 text-blue-600" />
+                  <p className="font-medium text-lg">Revisa los cambios antes de guardar</p>
                 </div>
-              )}
-            </div>
-
-            {/* Imagen Principal */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
-                Imagen Principal
-              </h3>
-              <div className="space-y-3">
-                {image && (
-                  <div className="relative">
-                    <img
-                      src={image}
-                      alt="Imagen principal"
-                      className="w-32 h-32 object-cover rounded-lg border"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                      onClick={handleRemoveMainImage}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+                
+                <div className="flex items-center justify-between p-4 border rounded-lg max-w-md mx-auto mt-6">
+                  <div>
+                    <Label className="font-bold text-base">Producto Público</Label>
+                    <p className="text-sm text-gray-500">¿Visible en el catálogo?</p>
                   </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] || null;
-                      handleMainImageChange(file);
-                    }}
-                    className="flex-1"
+                  <Switch
+                    checked={formData.published}
+                    onCheckedChange={(checked) => handleInputChange("published", checked)}
                   />
-                  {uploadedMainImage && (
-                    <span className="text-sm text-green-600">
-                      ✓ Nueva imagen seleccionada
-                    </span>
-                  )}
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Imágenes Adicionales */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
-                Imágenes Adicionales
-              </h3>
-              <ImageUploadSquare
-                images={images}
-                onImagesChange={setImages}
-                uploadedImages={uploadedImages}
-                onUploadedImagesChange={setUploadedImages}
-                onRemoveImage={handleRemoveImage}
-              />
-            </div>
-
-            {/* Atributos Dinámicos */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
-                Atributos del Producto
-              </h3>
-              <DynamicAttributes
-                attributes={attributes}
-                onAttributesChange={setAttributes}
-              />
-            </div>
-
-            {/* Configuración de Visibilidad */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
-                Configuración de Visibilidad
-              </h3>
-              <div className="flex items-center space-x-3">
-                <Switch
-                  id="published"
-                  checked={formData.published}
-                  onCheckedChange={(checked) =>
-                    handleInputChange("published", checked)
-                  }
-                />
-                <Label htmlFor="published" className="text-sm font-medium">
-                  {formData.published ? "Producto Público" : "Producto Privado"}
-                </Label>
-              </div>
-              <p className="text-xs text-gray-500">
-                {formData.published
-                  ? "Este producto será visible en catálogos públicos"
-                  : "Este producto solo será visible en tu panel privado"}
-              </p>
-            </div>
-
-            {/* Botones */}
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  "Cancelar"
-                )}
-              </Button>
-              <Button
-                type="submit"
-                disabled={loading}
-                className="min-w-[120px]"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Guardar Cambios
-                  </>
-                )}
-              </Button>
-            </div>
           </form>
         </div>
+
+        {/* Footer Navigation - Sticky */}
+        <div className="px-6 py-4 shrink-0 bg-white border-t flex justify-between items-center">
+          <Button 
+            type="button"
+            variant="outline" 
+            onClick={() => step === 1 ? onClose() : setStep(Math.max(1, step - 1))}
+            disabled={loading}
+          >
+            {step === 1 ? "Cancelar" : <><ChevronLeft className="w-4 h-4 mr-2" /> Atrás</>}
+          </Button>
+          
+          {step < totalSteps ? (
+            <Button type="button" onClick={() => setStep(Math.min(totalSteps, step + 1))}>
+              Siguiente <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
+          ) : (
+            <Button form="edit-product-form" type="submit" className="bg-green-600 hover:bg-green-700 min-w-[120px]" disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+              Guardar Cambios
+            </Button>
+          )}
+        </div>
+
       </DialogContent>
     </Dialog>
   );

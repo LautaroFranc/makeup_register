@@ -23,6 +23,7 @@ interface Product {
   };
   buyPrice: string;
   sellPrice: string;
+  wholesalePrice?: string;
   stock: number;
   code: string;
   barcode: string;
@@ -78,6 +79,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
                   <TableHead>Atributos</TableHead>
                   <TableHead>Precio de compra</TableHead>
                   <TableHead>Precio de venta</TableHead>
+                  <TableHead>Precio mayorista</TableHead>
                   <TableHead>Margen</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead>Total</TableHead>

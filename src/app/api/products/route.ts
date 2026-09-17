@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import Product from "@/models/Product"; // Asegúrate de que esta ruta sea correcta
 import connectDB from "@/config/db"; // Ruta de conexión a la base de datos
 import cloudinary from "@/config/cloudinary";
@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
       .skip(skip)
       .limit(limit)
       .select(
-        "name description image images attributes sellPrice category barcode stock published hasDiscount discountPercentage discountedPrice discountStartDate discountEndDate"
+        "name description image images attributes sellPrice wholesalePrice category barcode stock published hasDiscount discountPercentage discountedPrice discountStartDate discountEndDate"
       );
 
     // Obtener la tienda activa del usuario para aplicar descuento global
@@ -262,6 +262,7 @@ export async function POST(req: NextRequest) {
     const hasDiscount = productData.hasDiscount === "true" || productData.hasDiscount === true;
     const discountPercentage = parseFloat(productData.discountPercentage || "0");
     const sellPrice = parseFloat(productData.sellPrice || "0");
+    const wholesalePrice = productData.wholesalePrice || "0";
 
     // Calcular precio con descuento
     let discountedPrice = sellPrice;
@@ -314,6 +315,7 @@ export async function POST(req: NextRequest) {
       user: userId,
       store: targetStoreId,
       stock: productData.stock ? parseInt(productData.stock as string) : 0,
+      wholesalePrice: wholesalePrice,
       hasDiscount: hasDiscount,
       discountPercentage: discountPercentage,
       discountedPrice: discountedPrice.toFixed(2),
@@ -517,6 +519,7 @@ export async function PUT(req: NextRequest) {
     const hasDiscount = productData.hasDiscount === "true" || productData.hasDiscount === true;
     const discountPercentage = parseFloat(productData.discountPercentage || "0");
     const sellPriceValue = parseFloat(productData.sellPrice || "0");
+    const wholesalePrice = productData.wholesalePrice || "0";
 
     // Calcular precio con descuento
     let discountedPrice = sellPriceValue;
@@ -530,6 +533,7 @@ export async function PUT(req: NextRequest) {
       description: productData.description,
       buyPrice: productData.buyPrice,
       sellPrice: productData.sellPrice,
+      wholesalePrice: wholesalePrice,
       stock: parseInt(productData.stock),
       category: productData.category,
       attributes: JSON.parse(productData.attributes || "{}"),

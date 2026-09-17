@@ -60,7 +60,7 @@ export const ColorAttributeManager: React.FC<ColorAttributeManagerProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <Label className="text-lg font-semibold">Colores del Producto</Label>
         <ColorPicker onColorSelect={addColors} />
       </div>

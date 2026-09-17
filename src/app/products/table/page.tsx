@@ -25,6 +25,7 @@ interface Product {
   };
   buyPrice: string;
   sellPrice: string;
+  wholesalePrice?: string;
   stock: number;
   category: string;
   code: string;

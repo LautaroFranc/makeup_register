@@ -41,6 +41,7 @@ interface Product {
   };
   buyPrice: string;
   sellPrice: string;
+  wholesalePrice?: string;
   stock: number;
   code: string;
   barcode: string;
@@ -443,7 +444,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
 
           {/* Información de precios y stock */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div>
               <p className="text-sm text-gray-500">Precio de Compra</p>
               <p className="font-semibold">
@@ -471,6 +472,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   {formatToARS(parseFloat(product.sellPrice))}
                 </p>
               )}
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Precio Mayorista</p>
+              <p className="font-semibold text-purple-600">
+                {formatToARS(parseFloat(product.wholesalePrice || "0"))}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Margen</p>

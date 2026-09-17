@@ -10,6 +10,7 @@ export interface IProduct extends Document {
   };
   buyPrice: string;
   sellPrice: string;
+  wholesalePrice: string; // Precio mayorista
   stock: number;
   code: string;
   barcode: string; // Código de barras EAN-13/EAN-8
@@ -61,6 +62,10 @@ const ProductSchema: Schema<IProduct> = new Schema(
     sellPrice: {
       type: String,
       required: true,
+    },
+    wholesalePrice: {
+      type: String,
+      default: "0",
     },
     stock: {
       type: Number,
