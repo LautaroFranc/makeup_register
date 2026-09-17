@@ -14,6 +14,8 @@ import {
   Send,
   CheckSquare,
   Square,
+  MailCheck,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +45,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { buildEmailTemplate } from "@/lib/emailTemplate";
 
 interface Lead {
   _id: string;
@@ -80,6 +83,13 @@ export default function LeadsPage() {
   // Estado para selección de filas
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  // Estados para Modal de Configuración de Email de Bienvenida
+  const [stores, setStores] = useState<any[]>([]);
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
+  const [welcomeSubject, setWelcomeSubject] = useState("¡Gracias por registrarte!");
+  const [welcomeTemplate, setWelcomeTemplate] = useState("");
+  const [savingWelcomeEmail, setSavingWelcomeEmail] = useState(false);
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -90,6 +100,90 @@ export default function LeadsPage() {
   });
 
   const { toast } = useToast();
+
+  // Cargar tiendas para obtener la configuración del correo de bienvenida
+  const fetchStoreConfig = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/stores", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.stores && data.stores.length > 0) {
+        setStores(data.stores);
+        const storeId = data.stores[0]._id;
+        const detailRes = await fetch(`/api/stores?id=${storeId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const detailData = await detailRes.json();
+        if (detailData.success && detailData.store?.settings) {
+          setWelcomeSubject(
+            detailData.store.settings.welcomeEmailSubject || "¡Gracias por registrarte!"
+          );
+          setWelcomeTemplate(
+            detailData.store.settings.welcomeEmailTemplate || ""
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Error al cargar tiendas:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchStoreConfig();
+  }, []);
+
+  const handleSaveWelcomeEmail = async () => {
+    if (!stores || stores.length === 0) {
+      toast({
+        title: "Error",
+        description: "No se encontró una tienda asociada para guardar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSavingWelcomeEmail(true);
+      const token = localStorage.getItem("token");
+      const storeId = stores[0]._id;
+
+      const response = await fetch(`/api/stores?id=${storeId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          settings: {
+            welcomeEmailSubject: welcomeSubject,
+            welcomeEmailTemplate: welcomeTemplate,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "¡Plantilla Guardada!",
+          description: "La plantilla del correo de bienvenida ha sido actualizada exitosamente.",
+        });
+        setIsWelcomeModalOpen(false);
+      } else {
+        throw new Error(result.error || "No se pudo actualizar la plantilla");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Error al guardar la plantilla: ${error.message || error}`,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingWelcomeEmail(false);
+    }
+  };
 
   const fetchLeads = async () => {
     try {
@@ -231,6 +325,97 @@ export default function LeadsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Botón para configurar Email de Bienvenida */}
+          <Dialog open={isWelcomeModalOpen} onOpenChange={setIsWelcomeModalOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="flex items-center gap-2 border-purple-300 text-purple-700 hover:bg-purple-50"
+              >
+                <MailCheck className="h-4 w-4" />
+                Email Bienvenida
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-purple-700">
+                  <Sparkles className="h-5 w-5" /> Configurar Correo de Bienvenida
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <p className="text-xs text-muted-foreground">
+                  Personaliza el mensaje automático que reciben tus clientes al registrarse desde tu tienda pública.
+                </p>
+
+                <div className="space-y-2">
+                  <Label htmlFor="welcomeSubject">Asunto del Correo</Label>
+                  <Input
+                    id="welcomeSubject"
+                    value={welcomeSubject}
+                    onChange={(e) => setWelcomeSubject(e.target.value)}
+                    placeholder="Ej: ¡Gracias por registrarte!"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="welcomeTemplate">Cuerpo del Correo (Texto o HTML)</Label>
+                    <span className="text-[11px] text-purple-600 font-medium">
+                      Variables: {"{name}"}, {"{tienda}"}
+                    </span>
+                  </div>
+                  <Textarea
+                    id="welcomeTemplate"
+                    rows={6}
+                    className="font-mono text-xs"
+                    value={welcomeTemplate}
+                    onChange={(e) => setWelcomeTemplate(e.target.value)}
+                    placeholder="<h2>¡Hola {name}!</h2>\n<p>Gracias por unirte a {tienda}...</p>"
+                  />
+                </div>
+
+                {/* Previsualización rápida */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Vista Previa</Label>
+                  <div className="border rounded-md p-2 bg-muted/10 h-40 overflow-hidden">
+                    <iframe
+                      title="Preview Email Bienvenida Modal"
+                      srcDoc={buildEmailTemplate({
+                        storeName: stores[0]?.name || "Tu Tienda",
+                        content: welcomeTemplate
+                          ? welcomeTemplate
+                              .replace(/{name}/gi, "María Pérez")
+                              .replace(/{nombre}/gi, "María Pérez")
+                              .replace(/{tienda}/gi, stores[0]?.name || "Tu Tienda")
+                          : `<h2 style="color: #d946ef; text-align: center; margin-top: 0;">¡Gracias por registrarte, María Pérez!</h2><p style="font-size: 15px; color: #333;">Nos alegra mucho tenerte con nosotros.</p>`,
+                        isHtml: true,
+                        recipientEmail: "cliente@ejemplo.com",
+                      })}
+                      className="w-full h-full border-0"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsWelcomeModalOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleSaveWelcomeEmail}
+                    disabled={savingWelcomeEmail}
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    {savingWelcomeEmail ? "Guardando..." : "Guardar Plantilla"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {/* Botón para redactar novedades */}
           <Button
             variant="outline"

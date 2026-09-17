@@ -4,6 +4,8 @@ import Product from "@/models/Product";
 import connectDB from "@/config/db";
 import { authMiddleware } from "../middleware";
 
+export const dynamic = "force-dynamic";
+
 connectDB();
 
 // GET - Obtener todas las categorías del usuario

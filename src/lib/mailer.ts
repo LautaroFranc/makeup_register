@@ -1,4 +1,7 @@
 import nodemailer from "nodemailer";
+import { buildEmailTemplate } from "./emailTemplate";
+
+export { buildEmailTemplate };
 
 export const transporter = nodemailer.createTransport({
   service: process.env.EMAIL_SERVICE || "gmail",
@@ -12,10 +15,14 @@ export async function sendWelcomeEmail({
   to,
   name,
   storeName,
+  customSubject,
+  customTemplate,
 }: {
   to: string;
   name: string;
   storeName?: string;
+  customSubject?: string;
+  customTemplate?: string;
 }) {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.warn(
@@ -24,11 +31,18 @@ export async function sendWelcomeEmail({
     return;
   }
 
-  const subject = `¡Bienvenido/a${storeName ? ` a ${storeName}` : ""}! 🎉`;
+  const subject = customSubject || `¡Bienvenido/a${storeName ? ` a ${storeName}` : ""}! 🎉`;
 
-  const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-      <h2 style="color: #d946ef; text-align: center;">¡Gracias por registrarte, ${name}!</h2>
+  // Si el usuario configuró una plantilla personalizada, reemplazar la variable {name} o {nombre}
+  let bodyContent = "";
+  if (customTemplate && customTemplate.trim()) {
+    bodyContent = customTemplate
+      .replace(/{name}/gi, name)
+      .replace(/{nombre}/gi, name)
+      .replace(/{tienda}/gi, storeName || "nuestra tienda");
+  } else {
+    bodyContent = `
+      <h2 style="color: #d946ef; text-align: center; margin-top: 0;">¡Gracias por registrarte, ${name}!</h2>
       <p style="font-size: 16px; color: #333; line-height: 1.5;">
         Nos alegra mucho tenerte con nosotros. Hemos recibido tus datos correctamente.
       </p>
@@ -42,12 +56,15 @@ export async function sendWelcomeEmail({
           Pronto nos pondremos en contacto contigo para brindarte más novedades e información sobre nuestros productos.
         </p>
       </div>
-      <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-      <p style="font-size: 12px; color: #888; text-align: center;">
-        Este es un correo automático de bienvenida.
-      </p>
-    </div>
-  `;
+    `;
+  }
+
+  const htmlContent = buildEmailTemplate({
+    storeName,
+    content: bodyContent,
+    isHtml: true,
+    recipientEmail: to,
+  });
 
   try {
     await transporter.sendMail({
@@ -62,15 +79,19 @@ export async function sendWelcomeEmail({
   }
 }
 
+
+
 export async function sendBroadcastEmail({
   recipients,
   subject,
   content,
+  isHtml = false,
   storeName,
 }: {
   recipients: string[];
   subject: string;
   content: string;
+  isHtml?: boolean;
   storeName?: string;
 }) {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -83,31 +104,7 @@ export async function sendBroadcastEmail({
     throw new Error("No hay destinatarios con correo electrónico válido.");
   }
 
-  const formattedContent = content.replace(/\n/g, "<br/>");
-
-  const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
-      <div style="text-align: center; padding-bottom: 16px; border-bottom: 2px solid #f3e8ff;">
-        <h1 style="color: #9333ea; margin: 0; font-size: 22px;">${storeName || "Makeup Register"}</h1>
-        <p style="color: #6b7280; font-size: 13px; margin-top: 4px;">Novedades y promociones exclusivas</p>
-      </div>
-      
-      <div style="padding: 24px 0; color: #374151; font-size: 15px; line-height: 1.6;">
-        ${formattedContent}
-      </div>
-
-      <div style="margin-top: 24px; padding: 16px; background-color: #faf5ff; border-radius: 8px; text-align: center;">
-        <p style="margin: 0; color: #7e22ce; font-size: 14px; font-weight: 600;">
-          ¡Gracias por confiar en nosotros! 💖
-        </p>
-      </div>
-
-      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0 16px 0;" />
-      <p style="font-size: 11px; color: #9ca3af; text-align: center; margin: 0;">
-        Has recibido este correo por ser cliente de ${storeName || "nuestra tienda"}.
-      </p>
-    </div>
-  `;
+  const htmlContent = buildEmailTemplate({ storeName, content, isHtml });
 
   // Enviar a todos usando BCC para privacidad entre clientes
   const mailOptions = {

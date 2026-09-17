@@ -134,6 +134,8 @@ export async function POST(req: NextRequest) {
         to: email,
         name,
         storeName: targetStore?.name || targetUser.name,
+        customSubject: targetStore?.settings?.welcomeEmailSubject,
+        customTemplate: targetStore?.settings?.welcomeEmailTemplate,
       }).catch((err) => console.error("Error asíncrono al enviar bienvenida:", err));
     }
 

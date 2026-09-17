@@ -20,11 +20,18 @@ import {
   Palette,
   Building2,
   Monitor,
+  Mail,
 } from "lucide-react";
+import { buildEmailTemplate } from "@/lib/emailTemplate";
 
 export default function SettingsPage() {
   const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Estados para plantilla de bienvenida personalizada
+  const [welcomeSubject, setWelcomeSubject] = useState("¡Gracias por registrarte!");
+  const [welcomeTemplate, setWelcomeTemplate] = useState("");
+  const [savingWelcomeEmail, setSavingWelcomeEmail] = useState(false);
   const [userFormData, setUserFormData] = useState({
     name: "",
     email: "",
@@ -63,6 +70,23 @@ export default function SettingsPage() {
       if (response.ok) {
         const data = await response.json();
         setStores(data.stores);
+
+        // Si hay al menos una tienda, pedir detalle para cargar configuraciones completas
+        if (data.stores && data.stores.length > 0) {
+          const firstStoreId = data.stores[0]._id;
+          const detailRes = await fetch(`/api/stores?id=${firstStoreId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const detailData = await detailRes.json();
+          if (detailData.success && detailData.store?.settings) {
+            setWelcomeSubject(
+              detailData.store.settings.welcomeEmailSubject || "¡Gracias por registrarte!"
+            );
+            setWelcomeTemplate(
+              detailData.store.settings.welcomeEmailTemplate || ""
+            );
+          }
+        }
       } else {
         throw new Error("Error al cargar tiendas");
       }
@@ -173,6 +197,57 @@ export default function SettingsPage() {
     }
   };
 
+  // Guardar plantilla de email de bienvenida
+  const handleSaveWelcomeEmail = async () => {
+    if (!stores || stores.length === 0) {
+      toast({
+        title: "Error",
+        description: "No se encontró una tienda asociada para guardar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSavingWelcomeEmail(true);
+      const token = localStorage.getItem("token");
+      const storeId = stores[0]._id;
+
+      const response = await fetch(`/api/stores?id=${storeId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          settings: {
+            welcomeEmailSubject: welcomeSubject,
+            welcomeEmailTemplate: welcomeTemplate,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "¡Plantilla Guardada!",
+          description: "La plantilla del correo de bienvenida ha sido actualizada exitosamente.",
+        });
+      } else {
+        throw new Error(result.error || "No se pudo actualizar la plantilla");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Error al guardar la plantilla: ${error.message || error}`,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingWelcomeEmail(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -195,7 +270,7 @@ export default function SettingsPage() {
 
       {/* Tabs de Configuración */}
       <Tabs defaultValue="products" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="products" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Productos
@@ -211,6 +286,10 @@ export default function SettingsPage() {
           <TabsTrigger value="page" className="flex items-center gap-2">
             <Monitor className="h-4 w-4" />
             Página
+          </TabsTrigger>
+          <TabsTrigger value="email" className="flex items-center gap-2">
+            <Mail className="h-4 w-4" />
+            Email Bienvenida
           </TabsTrigger>
         </TabsList>
 
@@ -818,6 +897,96 @@ export default function SettingsPage() {
                 Guardar Configuración
               </Button>
             </div>
+          </div>
+        </TabsContent>
+
+        {/* Tab de Email de Bienvenida */}
+        <TabsContent value="email" className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-semibold">Correo de Bienvenida Automático</h2>
+            <p className="text-gray-600">
+              Personaliza el correo electrónico que reciben automáticamente tus nuevos clientes al registrarse.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Editor */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" /> Configurar Mensaje
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="welcomeSubject">Asunto del Correo</Label>
+                  <Input
+                    id="welcomeSubject"
+                    value={welcomeSubject}
+                    onChange={(e) => setWelcomeSubject(e.target.value)}
+                    placeholder="Ej: ¡Gracias por sumarte a nuestra comunidad!"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="welcomeTemplate">Cuerpo del Correo (HTML o Texto)</Label>
+                    <span className="text-xs text-purple-600 font-medium">
+                      Variables: {"{name}"}, {"{tienda}"}
+                    </span>
+                  </div>
+                  <Textarea
+                    id="welcomeTemplate"
+                    rows={12}
+                    value={welcomeTemplate}
+                    onChange={(e) => setWelcomeTemplate(e.target.value)}
+                    placeholder="<h2>¡Hola {name}!</h2>\n<p>Gracias por registrarte en {tienda}. Disfruta de nuestras promociones...</p>"
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Si dejas este campo vacío, se enviará el diseño de bienvenida estándar por defecto.
+                  </p>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button
+                    onClick={handleSaveWelcomeEmail}
+                    disabled={savingWelcomeEmail}
+                  >
+                    {savingWelcomeEmail ? "Guardando..." : "Guardar Plantilla"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Vista previa */}
+            <Card className="flex flex-col">
+              <CardHeader className="pb-3 border-b">
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span>Vista Previa del Email</span>
+                  <Badge variant="outline" className="text-xs">En Vivo</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 p-3 bg-muted/20 min-h-[400px]">
+                <div className="w-full h-full min-h-[380px] rounded-lg border bg-white overflow-hidden shadow-xs">
+                  <iframe
+                    title="Vista Previa Email Bienvenida"
+                    srcDoc={buildEmailTemplate({
+                      storeName: stores[0]?.name || "Tu Tienda",
+                      content: welcomeTemplate
+                        ? welcomeTemplate
+                            .replace(/{name}/gi, "María Pérez")
+                            .replace(/{nombre}/gi, "María Pérez")
+                            .replace(/{tienda}/gi, stores[0]?.name || "Tu Tienda")
+                        : `<h2 style="color: #d946ef; text-align: center; margin-top: 0;">¡Gracias por registrarte, María Pérez!</h2><p style="font-size: 16px; color: #333;">Nos alegra mucho tenerte con nosotros.</p>`,
+                      isHtml: true,
+                      recipientEmail: "cliente@ejemplo.com",
+                    })}
+                    className="w-full h-full min-h-[380px] border-0"
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
       </Tabs>

@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
     const userId = decoded.userId;
     const body = await req.json();
-    const { subject, content, targetType, selectedLeadIds } = body;
+    const { subject, content, isHtml, targetType, selectedLeadIds } = body;
 
     if (!subject || !subject.trim()) {
       return NextResponse.json(
@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
       recipients: recipientEmails,
       subject,
       content,
+      isHtml: Boolean(isHtml),
       storeName,
     });
 

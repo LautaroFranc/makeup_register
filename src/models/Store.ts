@@ -58,6 +58,8 @@ export interface IStore extends Document {
     showStock: boolean;
     enableSearch: boolean;
     enableFilters: boolean;
+    welcomeEmailSubject?: string;
+    welcomeEmailTemplate?: string;
   };
 
   // Métodos de pago
@@ -250,6 +252,14 @@ const StoreSchema: Schema<IStore> = new Schema(
       enableFilters: {
         type: Boolean,
         default: true,
+      },
+      welcomeEmailSubject: {
+        type: String,
+        default: "¡Gracias por registrarte!",
+      },
+      welcomeEmailTemplate: {
+        type: String,
+        default: "",
       },
     },
 
