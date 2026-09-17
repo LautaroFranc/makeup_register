@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Users,
   Plus,
@@ -8,9 +9,11 @@ import {
   Mail,
   Phone,
   Tag,
-  FileText,
   UserCheck,
   RefreshCw,
+  Send,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +57,10 @@ interface Lead {
   createdAt: string;
 }
 
-const statusBadges: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+const statusBadges: Record<
+  string,
+  { label: string; variant: "default" | "secondary" | "outline" | "destructive" }
+> = {
   nuevo: { label: "Nuevo", variant: "default" },
   contactado: { label: "Contactado", variant: "secondary" },
   interesado: { label: "Interesado", variant: "outline" },
@@ -63,12 +69,16 @@ const statusBadges: Record<string, { label: string; variant: "default" | "second
 };
 
 export default function LeadsPage() {
+  const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Estado para selección de filas
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -119,6 +129,41 @@ export default function LeadsPage() {
   useEffect(() => {
     fetchLeads();
   }, [search, statusFilter]);
+
+  const toggleSelectAll = () => {
+    const leadsWithEmail = leads.filter((l) => l.email && l.email.includes("@"));
+    if (selectedIds.length === leadsWithEmail.length && leadsWithEmail.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(leadsWithEmail.map((l) => l._id));
+    }
+  };
+
+  const toggleSelectLead = (id: string) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter((item) => item !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
+
+  const handleGoToNovedades = (target: "all" | "selected") => {
+    if (target === "selected" && selectedIds.length === 0) {
+      toast({
+        title: "Selecciona al menos un cliente",
+        description: "Por favor marca las casillas de los clientes a quienes deseas enviar la novedad.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const query = new URLSearchParams();
+    query.append("target", target);
+    if (target === "selected") {
+      query.append("ids", selectedIds.join(","));
+    }
+    router.push(`/leads/novedades?${query.toString()}`);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,6 +216,8 @@ export default function LeadsPage() {
     }
   };
 
+  const leadsWithEmail = leads.filter((l) => l.email && l.email.includes("@"));
+
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -179,125 +226,139 @@ export default function LeadsPage() {
             <Users className="h-7 w-7 text-primary" /> Clientes & Leads
           </h1>
           <p className="text-muted-foreground text-sm">
-            Gestión de prospectos, clientes potenciales y contactos.
+            Gestión de prospectos, clientes potenciales y envío de novedades.
           </p>
         </div>
 
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" /> Agregar Lead
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <UserCheck className="h-5 w-5 text-primary" /> Nuevo Cliente / Lead
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre completo *</Label>
-                <Input
-                  id="name"
-                  placeholder="Ej: María Pérez"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  required
-                />
-              </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Botón para redactar novedades */}
+          <Button
+            variant="outline"
+            className="flex items-center gap-2 border-primary/40 text-primary hover:bg-primary/10"
+            onClick={() => handleGoToNovedades(selectedIds.length > 0 ? "selected" : "all")}
+          >
+            <Send className="h-4 w-4" />
+            {selectedIds.length > 0
+              ? `Enviar Novedad (${selectedIds.length})`
+              : "Enviar Novedades"}
+          </Button>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <Plus className="h-4 w-4" /> Agregar Lead
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <UserCheck className="h-5 w-5 text-primary" /> Nuevo Cliente / Lead
+                </DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4 py-2">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="name">Nombre completo *</Label>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="maria@ejemplo.com"
-                    value={formData.email}
+                    id="name"
+                    placeholder="Ej: María Pérez"
+                    value={formData.name}
                     onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
+                      setFormData({ ...formData, name: e.target.value })
                     }
+                    required
                   />
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="maria@ejemplo.com"
+                      value={formData.email}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Teléfono / WhatsApp</Label>
+                    <Input
+                      id="phone"
+                      placeholder="+54 9 11 1234-5678"
+                      value={formData.phone}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Estado</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(val) =>
+                        setFormData({ ...formData, status: val })
+                      }
+                    >
+                      <SelectTrigger id="status">
+                        <SelectValue placeholder="Estado" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="nuevo">Nuevo</SelectItem>
+                        <SelectItem value="contactado">Contactado</SelectItem>
+                        <SelectItem value="interesado">Interesado</SelectItem>
+                        <SelectItem value="cliente">Cliente</SelectItem>
+                        <SelectItem value="inactivo">Inactivo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="source">Origen / Fuente</Label>
+                    <Input
+                      id="source"
+                      placeholder="Instagram, Tienda, Recomendado..."
+                      value={formData.source}
+                      onChange={(e) =>
+                        setFormData({ ...formData, source: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Teléfono / WhatsApp</Label>
-                  <Input
-                    id="phone"
-                    placeholder="+54 9 11 1234-5678"
-                    value={formData.phone}
+                  <Label htmlFor="notes">Notas o Comentarios</Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Detalles sobre las preferencias o contacto..."
+                    value={formData.notes}
                     onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
+                      setFormData({ ...formData, notes: e.target.value })
                     }
+                    rows={3}
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="status">Estado</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(val) =>
-                      setFormData({ ...formData, status: val })
-                    }
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsModalOpen(false)}
                   >
-                    <SelectTrigger id="status">
-                      <SelectValue placeholder="Estado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="nuevo">Nuevo</SelectItem>
-                      <SelectItem value="contactado">Contactado</SelectItem>
-                      <SelectItem value="interesado">Interesado</SelectItem>
-                      <SelectItem value="cliente">Cliente</SelectItem>
-                      <SelectItem value="inactivo">Inactivo</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={submitting}>
+                    {submitting ? "Guardando..." : "Guardar Lead"}
+                  </Button>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="source">Origen / Fuente</Label>
-                  <Input
-                    id="source"
-                    placeholder="Instagram, Tienda, Recomendado..."
-                    value={formData.source}
-                    onChange={(e) =>
-                      setFormData({ ...formData, source: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notas o Comentarios</Label>
-                <Textarea
-                  id="notes"
-                  placeholder="Detalles sobre las preferencias o contacto..."
-                  value={formData.notes}
-                  onChange={(e) =>
-                    setFormData({ ...formData, notes: e.target.value })
-                  }
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsModalOpen(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? "Guardando..." : "Guardar Lead"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Filtros y búsqueda */}
@@ -338,6 +399,21 @@ export default function LeadsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[40px] text-center">
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  className="p-1 hover:text-primary transition-colors"
+                  title="Seleccionar todos los que tienen email"
+                >
+                  {selectedIds.length > 0 &&
+                  selectedIds.length === leadsWithEmail.length ? (
+                    <CheckSquare className="h-4 w-4 text-primary" />
+                  ) : (
+                    <Square className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </button>
+              </TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Contacto</TableHead>
               <TableHead>Estado</TableHead>
@@ -349,13 +425,13 @@ export default function LeadsPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   Cargando clientes y leads...
                 </TableCell>
               </TableRow>
             ) : leads.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   No se encontraron clientes o leads registrados.
                 </TableCell>
               </TableRow>
@@ -365,8 +441,35 @@ export default function LeadsPage() {
                   label: lead.status,
                   variant: "secondary",
                 };
+                const hasValidEmail = Boolean(lead.email && lead.email.includes("@"));
+                const isSelected = selectedIds.includes(lead._id);
+
                 return (
-                  <TableRow key={lead._id}>
+                  <TableRow
+                    key={lead._id}
+                    className={isSelected ? "bg-primary/5" : ""}
+                  >
+                    <TableCell className="text-center">
+                      <button
+                        type="button"
+                        disabled={!hasValidEmail}
+                        onClick={() => toggleSelectLead(lead._id)}
+                        className={`p-1 transition-colors ${
+                          !hasValidEmail ? "opacity-30 cursor-not-allowed" : "hover:text-primary"
+                        }`}
+                        title={
+                          hasValidEmail
+                            ? "Seleccionar para novedad"
+                            : "Este cliente no tiene correo electrónico"
+                        }
+                      >
+                        {isSelected ? (
+                          <CheckSquare className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Square className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </button>
+                    </TableCell>
                     <TableCell className="font-medium">{lead.name}</TableCell>
                     <TableCell>
                       <div className="space-y-1 text-xs">

@@ -4,6 +4,7 @@ import Lead from "@/models/Lead";
 import Users from "@/models/Users";
 import Store from "@/models/Store";
 import { authMiddleware, verifyToken } from "../middleware";
+import { sendWelcomeEmail } from "@/lib/mailer";
 
 connectDB();
 
@@ -126,6 +127,15 @@ export async function POST(req: NextRequest) {
       store: targetStore ? targetStore._id : undefined,
       user: targetUser._id,
     });
+
+    // Enviar email de bienvenida si proporcionó un email
+    if (email && email.trim() !== "") {
+      sendWelcomeEmail({
+        to: email,
+        name,
+        storeName: targetStore?.name || targetUser.name,
+      }).catch((err) => console.error("Error asíncrono al enviar bienvenida:", err));
+    }
 
     return NextResponse.json(
       {

@@ -14,6 +14,15 @@ import { Search, RotateCcw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StorePreviewButton } from "@/components/StorePreviewButton";
+import { Percent, Sparkles } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface Product {
   _id: string;
@@ -131,6 +140,55 @@ export default function ProductDashboard() {
     loading: summaryLoading,
   } = useFetch<{ success: boolean; data: DashboardSummary }>();
   const { toast } = useToast();
+
+  // Estado para la acción rápida de generación masiva de precios mayoristas
+  const [isWholesaleDialogOpen, setIsWholesaleDialogOpen] = useState(false);
+  const [wholesaleDiscountPercent, setWholesaleDiscountPercent] = useState<number>(10);
+  const [submittingWholesale, setSubmittingWholesale] = useState(false);
+
+  const handleGenerateWholesalePrices = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSubmittingWholesale(true);
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/products/bulk-wholesale", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          discountPercentage: wholesaleDiscountPercent,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        toast({
+          title: "¡Éxito!",
+          description: data.message || "Precios mayoristas generados correctamente",
+        });
+        setIsWholesaleDialogOpen(false);
+        loadProducts(currentPage, filters);
+        loadDashboardSummary();
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "No se pudieron actualizar los precios mayoristas",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Error de conexión al generar precios mayoristas",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingWholesale(false);
+    }
+  };
 
   // Fetch initial data
   useEffect(() => {
@@ -454,20 +512,85 @@ export default function ProductDashboard() {
       </Card>
 
       <div>
-        {/* Filtros */}
+        {/* Filtros y Acciones Rápidas */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
             <h2 className="text-lg font-semibold text-gray-900">
               Filtros de Productos
             </h2>
-            <Button
-              variant="outline"
-              onClick={handleClearFilters}
-              className="flex items-center gap-2"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Limpiar Filtros
-            </Button>
+            <div className="flex items-center gap-3">
+              {/* Diálogo Acción Rápida: Generar Precios Mayoristas */}
+              <Dialog open={isWholesaleDialogOpen} onOpenChange={setIsWholesaleDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2 border-purple-300 text-purple-700 hover:bg-purple-50">
+                    <Percent className="h-4 w-4" />
+                    Generar Precios Mayoristas
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-purple-700">
+                      <Sparkles className="h-5 w-5" /> Generar Precios Mayoristas
+                    </DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleGenerateWholesalePrices} className="space-y-4 py-3">
+                    <p className="text-sm text-muted-foreground">
+                      Esta acción calculará y actualizará automáticamente el precio mayorista de <strong>todos tus productos</strong> aplicando un porcentaje de descuento sobre el precio minorista.
+                    </p>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="discountPercent" className="text-sm font-medium">
+                        Porcentaje de Descuento (%)
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="discountPercent"
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={wholesaleDiscountPercent}
+                          onChange={(e) => setWholesaleDiscountPercent(Number(e.target.value))}
+                          className="pr-8"
+                          required
+                        />
+                        <span className="absolute right-3 top-2.5 text-sm text-muted-foreground font-semibold">
+                          %
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Por defecto es <strong>10%</strong> (precio mayorista = 10% menos que el minorista).
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsWholesaleDialogOpen(false)}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={submittingWholesale}
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                      >
+                        {submittingWholesale ? "Calculando..." : "Generar Precios"}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
+              <Button
+                variant="outline"
+                onClick={handleClearFilters}
+                className="flex items-center gap-2"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Limpiar Filtros
+              </Button>
+            </div>
           </div>
           <ProductFilters
             onFiltersChange={handleFiltersChange}
