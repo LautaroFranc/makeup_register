@@ -5,13 +5,25 @@ import connectDB from "@/config/db";
 
 export { buildEmailTemplate };
 
-export const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+export const transporter = nodemailer.createTransport(
+  process.env.EMAIL_HOST
+    ? {
+        host: process.env.EMAIL_HOST,
+        port: Number(process.env.EMAIL_PORT) || 587,
+        secure: process.env.EMAIL_SECURE === "true",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      }
+    : {
+        service: process.env.EMAIL_SERVICE || "gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      }
+);
 
 export async function sendWelcomeEmail({
   to,
@@ -72,9 +84,11 @@ export async function sendWelcomeEmail({
     recipientEmail: to,
   });
 
+  const senderEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+
   try {
     await transporter.sendMail({
-      from: `"${storeName || "Makeup Register"}" <${process.env.EMAIL_USER}>`,
+      from: `"${storeName || "Makeup Register"}" <${senderEmail}>`,
       to,
       subject,
       html: htmlContent,
@@ -144,9 +158,11 @@ export async function sendBroadcastEmail({
 
   const htmlContent = buildEmailTemplate({ storeName, content, isHtml });
 
+  const senderEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+
   // Enviar a todos usando BCC para privacidad entre clientes
   const mailOptions = {
-    from: `"${storeName || "Makeup Register"}" <${process.env.EMAIL_USER}>`,
+    from: `"${storeName || "Makeup Register"}" <${senderEmail}>`,
     bcc: recipients,
     subject: subject,
     html: htmlContent,
