@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     if (!decoded) {
       return NextResponse.json(
         { success: false, error: "No autorizado" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -27,14 +27,14 @@ export async function POST(req: NextRequest) {
     if (!subject || !subject.trim()) {
       return NextResponse.json(
         { success: false, error: "El asunto de la novedad es obligatorio" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!content || !content.trim()) {
       return NextResponse.json(
         { success: false, error: "El contenido del mensaje es obligatorio" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -45,7 +45,11 @@ export async function POST(req: NextRequest) {
     let query: any = { user: userId, email: { $exists: true, $ne: "" } };
 
     // Si seleccionó enviar solo a clientes específicos
-    if (targetType === "selected" && Array.isArray(selectedLeadIds) && selectedLeadIds.length > 0) {
+    if (
+      targetType === "selected" &&
+      Array.isArray(selectedLeadIds) &&
+      selectedLeadIds.length > 0
+    ) {
       query._id = { $in: selectedLeadIds };
     }
 
@@ -53,15 +57,18 @@ export async function POST(req: NextRequest) {
 
     const recipientEmails = leads
       .map((lead) => lead.email?.trim())
-      .filter((email): email is string => Boolean(email && email.includes("@")));
+      .filter((email): email is string =>
+        Boolean(email && email.includes("@")),
+      );
 
     if (recipientEmails.length === 0) {
       return NextResponse.json(
         {
           success: false,
-          error: "No se encontraron clientes con direcciones de correo válidas para enviar.",
+          error:
+            "No se encontraron clientes con direcciones de correo válidas para enviar.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -86,9 +93,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error.message || "Error inesperado al enviar las novedades por email.",
+        error:
+          error.message ||
+          "Error inesperado al enviar las novedades por email.",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

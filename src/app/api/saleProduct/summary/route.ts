@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import Product from "@/models/Product";
 import SaleProduct from "@/models/SaleProduct";
 import { authMiddleware } from "../../middleware";
+import connectDB from "@/config/db";
+
+export const dynamic = "force-dynamic";
+
+connectDB();
 
 interface SaleStats {
   totalStockSold: number;
@@ -136,9 +141,46 @@ export async function GET(req: NextRequest) {
       totalRevenue: data.totalRevenue,
     }));
 
-    // Respuesta final
-    const response: TrendResponse = {
+    // Obtener TODAS las ventas del usuario para totales históricos y hoy
+    const allSales = await SaleProduct.find({ user: userId });
+    
+    let totalRevenue = 0;
+    let totalCost = 0;
+    let totalStockSold = 0;
+    let todaySalesCount = 0;
+    let todayRevenue = 0;
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    for (const sale of allSales) {
+      const revenue = Number(sale.sellPrice) * sale.stock;
+      totalRevenue += revenue;
+      totalStockSold += sale.stock;
+
+      if (sale.createdAt) {
+        const saleDate = new Date(sale.createdAt);
+        if (saleDate >= startOfToday) {
+          todaySalesCount += 1;
+          todayRevenue += revenue;
+        }
+      }
+    }
+
+    const totalSales = allSales.length;
+    const totalProducts = allProducts.length;
+    const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
+
+    // Respuesta final con campos globales y estadísticas de tendencia
+    const response = {
+      success: true,
       totalStock,
+      totalProducts,
+      totalSales,
+      totalRevenue,
+      averageOrderValue,
+      todaySalesCount,
+      todayRevenue,
       currentMonthSales,
       previousMonthSales,
       salesTrendPercentage,

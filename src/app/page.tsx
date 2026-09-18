@@ -130,17 +130,26 @@ export default function Home() {
   const totalProducts = saleSummary?.totalProducts || 0;
   const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
 
-  // Obtener ventas de hoy
-  const todaySales = purchase.filter((p) => {
-    const saleDate = new Date(p.createdAt);
-    const today = new Date();
-    return saleDate.toDateString() === today.toDateString();
-  });
+  // Obtener ventas de hoy desde la API de ventas de productos (con fallback a compras)
+  const todaySalesCount =
+    saleSummary?.todaySalesCount !== undefined
+      ? saleSummary.todaySalesCount
+      : purchase.filter((p) => {
+          const saleDate = new Date(p.createdAt);
+          const today = new Date();
+          return saleDate.toDateString() === today.toDateString();
+        }).length;
 
-  const todayRevenue = todaySales.reduce(
-    (sum, sale) => sum + sale.totalPrice,
-    0
-  );
+  const todayRevenue =
+    saleSummary?.todayRevenue !== undefined
+      ? saleSummary.todayRevenue
+      : purchase
+          .filter((p) => {
+            const saleDate = new Date(p.createdAt);
+            const today = new Date();
+            return saleDate.toDateString() === today.toDateString();
+          })
+          .reduce((sum, sale) => sum + sale.totalPrice, 0);
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-4 space-y-6">
@@ -226,7 +235,7 @@ export default function Home() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Ventas Hoy</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {todaySales.length}
+                  {todaySalesCount}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {formatToARS(todayRevenue)} en ingresos
@@ -347,9 +356,9 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Ventas Hoy</span>
                 <Badge
-                  variant={todaySales.length > 0 ? "default" : "secondary"}
+                  variant={todaySalesCount > 0 ? "default" : "secondary"}
                 >
-                  {todaySales.length}
+                  {todaySalesCount}
                 </Badge>
               </div>
             </CardContent>

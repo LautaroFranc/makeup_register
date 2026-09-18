@@ -48,7 +48,9 @@ export default function SalesHistoryPage() {
   const [sales, setSales] = useState<SaleWithProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [saleToDelete, setSaleToDelete] = useState<SaleWithProduct | null>(null);
+  const [saleToDelete, setSaleToDelete] = useState<SaleWithProduct | null>(
+    null,
+  );
   const { toast } = useToast();
 
   useEffect(() => {
@@ -91,7 +93,7 @@ export default function SalesHistoryPage() {
                 code: product.code,
               },
             ];
-          })
+          }),
         );
 
         // Mapear ventas con información de productos
@@ -124,15 +126,12 @@ export default function SalesHistoryPage() {
     try {
       setDeleteLoading(true);
       const token = localStorage.getItem("token");
-      const response = await fetch(
-        `/api/saleProduct?id=${saleToDelete._id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`api/saleProduct?id=${saleToDelete._id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       const data = await response.json();
 
@@ -176,7 +175,7 @@ export default function SalesHistoryPage() {
   const calculateTotals = () => {
     const totalRevenue = sales.reduce(
       (sum, sale) => sum + parseFloat(sale.sellPrice) * sale.stock,
-      0
+      0,
     );
     const totalUnits = sales.reduce((sum, sale) => sum + sale.stock, 0);
     return { totalRevenue, totalUnits };
@@ -206,7 +205,9 @@ export default function SalesHistoryPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Ventas</p>
-                <p className="text-2xl font-bold text-gray-900">{sales.length}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {sales.length}
+                </p>
               </div>
               <History className="h-8 w-8 text-blue-600" />
             </div>
@@ -217,7 +218,9 @@ export default function SalesHistoryPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Unidades Vendidas</p>
-                <p className="text-2xl font-bold text-green-600">{totalUnits}</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {totalUnits}
+                </p>
               </div>
               <Package className="h-8 w-8 text-green-600" />
             </div>
@@ -286,10 +289,14 @@ export default function SalesHistoryPage() {
                           )}
                           <div>
                             <p className="font-medium">
-                              {sale.productDetails?.name || "Producto eliminado"}
+                              {sale.productDetails?.name ||
+                                "Producto eliminado"}
                             </p>
                             {!sale.productDetails && (
-                              <Badge variant="secondary" className="text-xs mt-1">
+                              <Badge
+                                variant="secondary"
+                                className="text-xs mt-1"
+                              >
                                 Producto no disponible
                               </Badge>
                             )}
@@ -347,17 +354,27 @@ export default function SalesHistoryPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar esta venta?</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-              <p>Esta acción eliminará la venta y restaurará el stock del producto.</p>
+              <p>
+                Esta acción eliminará la venta y restaurará el stock del
+                producto.
+              </p>
               {saleToDelete && (
                 <div className="bg-blue-50 p-3 rounded-lg mt-3 space-y-1">
                   <p className="font-medium text-sm text-blue-900">
-                    Producto: {saleToDelete.productDetails?.name || "Desconocido"}
+                    Producto:{" "}
+                    {saleToDelete.productDetails?.name || "Desconocido"}
                   </p>
                   <p className="text-sm text-blue-800">
-                    Cantidad a restaurar: <strong>{saleToDelete.stock} unidades</strong>
+                    Cantidad a restaurar:{" "}
+                    <strong>{saleToDelete.stock} unidades</strong>
                   </p>
                   <p className="text-sm text-blue-800">
-                    Monto: <strong>{formatToARS(parseFloat(saleToDelete.sellPrice) * saleToDelete.stock)}</strong>
+                    Monto:{" "}
+                    <strong>
+                      {formatToARS(
+                        parseFloat(saleToDelete.sellPrice) * saleToDelete.stock,
+                      )}
+                    </strong>
                   </p>
                 </div>
               )}

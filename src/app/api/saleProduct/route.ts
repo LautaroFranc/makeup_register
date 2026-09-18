@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
         message: "Error al obtener las ventas. Por favor intenta nuevamente.",
         details: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -61,14 +61,14 @@ export async function POST(req: NextRequest) {
     if (!productId) {
       return NextResponse.json(
         { success: false, message: "El ID del producto es requerido" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!quantity || quantity <= 0) {
       return NextResponse.json(
         { success: false, message: "La cantidad debe ser mayor a 0" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
           message: "Producto no encontrado. Verifica que el ID sea correcto.",
           details: `ID buscado: ${productId}`,
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
           message:
             "No tienes permiso para vender este producto. El producto pertenece a otro usuario.",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
           success: false,
           message: `Stock insuficiente. Disponible: ${product.stock}, Solicitado: ${quantity}`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
         productName: product.name,
         stockRestante: product.stock,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: any) {
     console.error("Error al registrar venta:", error);
@@ -143,21 +143,21 @@ export async function POST(req: NextRequest) {
           success: false,
           message: "ID de producto inválido. El formato del ID no es correcto.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Manejar errores de validación de Mongoose
     if (error.name === "ValidationError") {
       const validationErrors = Object.values(error.errors).map(
-        (err: any) => err.message
+        (err: any) => err.message,
       );
       return NextResponse.json(
         {
           success: false,
           message: "Error de validación: " + validationErrors.join(", "),
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
         message: "Error al registrar la venta. Por favor intenta nuevamente.",
         details: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -187,7 +187,7 @@ export async function DELETE(req: NextRequest) {
     if (!saleId) {
       return NextResponse.json(
         { success: false, message: "El ID de la venta es requerido" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -196,8 +196,11 @@ export async function DELETE(req: NextRequest) {
 
     if (!sale) {
       return NextResponse.json(
-        { success: false, message: "Venta no encontrada o no tienes permiso para eliminarla" },
-        { status: 404 }
+        {
+          success: false,
+          message: "Venta no encontrada o no tienes permiso para eliminarla",
+        },
+        { status: 404 },
       );
     }
 
@@ -208,9 +211,10 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "Producto asociado no encontrado. La venta será eliminada pero el stock no se restaurará.",
+          message:
+            "Producto asociado no encontrado. La venta será eliminada pero el stock no se restaurará.",
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -235,7 +239,7 @@ export async function DELETE(req: NextRequest) {
     if (error.name === "CastError") {
       return NextResponse.json(
         { success: false, message: "ID de venta inválido" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -245,7 +249,7 @@ export async function DELETE(req: NextRequest) {
         message: "Error al eliminar la venta",
         details: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
