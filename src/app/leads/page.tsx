@@ -16,6 +16,7 @@ import {
   Square,
   MailCheck,
   Sparkles,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,6 +90,29 @@ export default function LeadsPage() {
   const [welcomeSubject, setWelcomeSubject] = useState("¡Gracias por registrarte!");
   const [welcomeTemplate, setWelcomeTemplate] = useState("");
   const [savingWelcomeEmail, setSavingWelcomeEmail] = useState(false);
+
+  // Estados para Modal de Historial de Envíos de Correo
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [emailLogs, setEmailLogs] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const fetchEmailLogs = async () => {
+    try {
+      setLoadingHistory(true);
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/email-logs", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEmailLogs(data.logs || []);
+      }
+    } catch (err) {
+      console.error("Error al cargar historial de correos:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
 
   const [formData, setFormData] = useState({
     name: "",
@@ -412,6 +436,95 @@ export default function LeadsPage() {
                     {savingWelcomeEmail ? "Guardando..." : "Guardar Plantilla"}
                   </Button>
                 </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Botón para Historial de Envíos */}
+          <Dialog
+            open={isHistoryModalOpen}
+            onOpenChange={(open) => {
+              setIsHistoryModalOpen(open);
+              if (open) fetchEmailLogs();
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-100"
+              >
+                <History className="h-4 w-4 text-slate-600" />
+                Historial Envíos
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[750px] max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-slate-800">
+                  <History className="h-5 w-5 text-primary" /> Historial de Envíos de Correo
+                </DialogTitle>
+              </DialogHeader>
+              <div className="py-2 space-y-4">
+                {loadingHistory ? (
+                  <div className="flex justify-center py-8">
+                    <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                ) : emailLogs.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Mail className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                    <p>Aún no se registran envíos de correo en esta cuenta.</p>
+                  </div>
+                ) : (
+                  <div className="border rounded-md overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-muted/50">
+                        <TableRow>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Asunto</TableHead>
+                          <TableHead>Destinatarios</TableHead>
+                          <TableHead>Estado</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {emailLogs.map((log) => (
+                          <TableRow key={log._id}>
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                              {new Date(log.createdAt).toLocaleString("es-ES", {
+                                dateStyle: "short",
+                                timeStyle: "short",
+                              })}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={log.type === "welcome" ? "secondary" : "default"}
+                                className="text-[11px] capitalize"
+                              >
+                                {log.type === "welcome" ? "Bienvenida" : "Novedades"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium text-xs max-w-[200px] truncate" title={log.subject}>
+                              {log.subject}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {log.recipientCount} cliente(s)
+                            </TableCell>
+                            <TableCell>
+                              {log.status === "sent" ? (
+                                <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-emerald-200 text-[10px]">
+                                  Enviado
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="text-[10px]" title={log.errorMessage}>
+                                  Fallido
+                                </Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </div>
             </DialogContent>
           </Dialog>

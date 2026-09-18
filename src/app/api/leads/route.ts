@@ -6,6 +6,8 @@ import Store from "@/models/Store";
 import { authMiddleware, verifyToken } from "../middleware";
 import { sendWelcomeEmail } from "@/lib/mailer";
 
+export const dynamic = "force-dynamic";
+
 connectDB();
 
 // GET: Obtener lista de leads/clientes
@@ -136,6 +138,8 @@ export async function POST(req: NextRequest) {
         storeName: targetStore?.name || targetUser.name,
         customSubject: targetStore?.settings?.welcomeEmailSubject,
         customTemplate: targetStore?.settings?.welcomeEmailTemplate,
+        userId: targetUser._id.toString(),
+        storeId: targetStore?._id?.toString(),
       }).catch((err) => console.error("Error asíncrono al enviar bienvenida:", err));
     }
 

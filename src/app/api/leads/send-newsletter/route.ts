@@ -6,6 +6,8 @@ import Store from "@/models/Store";
 import { verifyToken } from "../../middleware";
 import { sendBroadcastEmail } from "@/lib/mailer";
 
+export const dynamic = "force-dynamic";
+
 connectDB();
 
 export async function POST(req: NextRequest) {
@@ -70,6 +72,8 @@ export async function POST(req: NextRequest) {
       content,
       isHtml: Boolean(isHtml),
       storeName,
+      userId: userId,
+      storeId: storeObj?._id?.toString(),
     });
 
     return NextResponse.json({
