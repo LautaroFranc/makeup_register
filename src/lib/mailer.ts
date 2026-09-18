@@ -1,5 +1,7 @@
 import nodemailer from "nodemailer";
 import { buildEmailTemplate } from "./emailTemplate";
+import EmailLog from "@/models/EmailLog";
+import connectDB from "@/config/db";
 
 export { buildEmailTemplate };
 
@@ -17,12 +19,16 @@ export async function sendWelcomeEmail({
   storeName,
   customSubject,
   customTemplate,
+  userId,
+  storeId,
 }: {
   to: string;
   name: string;
   storeName?: string;
   customSubject?: string;
   customTemplate?: string;
+  userId?: string;
+  storeId?: string;
 }) {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.warn(
@@ -74,12 +80,40 @@ export async function sendWelcomeEmail({
       html: htmlContent,
     });
     console.log(`✉️ Correo de bienvenida enviado a: ${to}`);
-  } catch (error) {
+
+    if (userId) {
+      await connectDB();
+      await EmailLog.create({
+        user: userId,
+        store: storeId,
+        type: "welcome",
+        subject,
+        recipients: [to],
+        recipientCount: 1,
+        status: "sent",
+      });
+    }
+  } catch (error: any) {
     console.error("❌ Error al enviar el correo de bienvenida:", error);
+    if (userId) {
+      try {
+        await connectDB();
+        await EmailLog.create({
+          user: userId,
+          store: storeId,
+          type: "welcome",
+          subject,
+          recipients: [to],
+          recipientCount: 1,
+          status: "failed",
+          errorMessage: error?.message || "Error al enviar correo",
+        });
+      } catch (logErr) {
+        console.error("Error guardando EmailLog:", logErr);
+      }
+    }
   }
 }
-
-
 
 export async function sendBroadcastEmail({
   recipients,
@@ -87,12 +121,16 @@ export async function sendBroadcastEmail({
   content,
   isHtml = false,
   storeName,
+  userId,
+  storeId,
 }: {
   recipients: string[];
   subject: string;
   content: string;
   isHtml?: boolean;
   storeName?: string;
+  userId?: string;
+  storeId?: string;
 }) {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     throw new Error(
@@ -114,6 +152,40 @@ export async function sendBroadcastEmail({
     html: htmlContent,
   };
 
-  const info = await transporter.sendMail(mailOptions);
-  return info;
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    if (userId) {
+      await connectDB();
+      await EmailLog.create({
+        user: userId,
+        store: storeId,
+        type: "broadcast",
+        subject,
+        recipients,
+        recipientCount: recipients.length,
+        status: "sent",
+      });
+    }
+    return info;
+  } catch (error: any) {
+    if (userId) {
+      try {
+        await connectDB();
+        await EmailLog.create({
+          user: userId,
+          store: storeId,
+          type: "broadcast",
+          subject,
+          recipients,
+          recipientCount: recipients.length,
+          status: "failed",
+          errorMessage: error?.message || "Error al enviar novedades",
+        });
+      } catch (logErr) {
+        console.error("Error guardando EmailLog:", logErr);
+      }
+    }
+    throw error;
+  }
 }
+
