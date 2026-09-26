@@ -24,6 +24,7 @@ export interface IProduct extends Document {
   discountedPrice: string; // Precio con descuento aplicado
   discountStartDate?: Date; // Fecha de inicio del descuento
   discountEndDate?: Date; // Fecha de fin del descuento
+  views: number; // Contador de visitas públicas al producto (usado por /api/analytics)
 }
 
 const ProductSchema: Schema<IProduct> = new Schema(
@@ -108,6 +109,11 @@ const ProductSchema: Schema<IProduct> = new Schema(
     },
     discountEndDate: {
       type: Date,
+    },
+    views: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
   },
   { timestamps: true }

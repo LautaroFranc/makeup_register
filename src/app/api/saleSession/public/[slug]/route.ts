@@ -15,6 +15,13 @@ export async function POST(
 
     const { sessionId, customerEmail, customerPhone, products, totalAmount, status } = body;
 
+    // Endpoint público: el status llega del cliente, hay que validarlo contra el enum
+    // del modelo para que un payload arbitrario no contamine el embudo de analíticas.
+    const VALID_STATUSES = ["CART_CREATED", "PAYMENT_INITIATED", "COMPLETED", "ABANDONED"] as const;
+    if (status !== undefined && !VALID_STATUSES.includes(status)) {
+      return NextResponse.json({ success: false, message: "Status inválido" }, { status: 400 });
+    }
+
     const store = await Store.findOne({ slug, isActive: true });
     if (!store) {
       return NextResponse.json({ success: false, message: "Tienda no encontrada" }, { status: 404 });

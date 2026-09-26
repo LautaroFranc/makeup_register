@@ -20,6 +20,7 @@ export interface Product {
   discountedPrice?: string;
   discountStartDate?: string;
   discountEndDate?: string;
+  views?: number;
   createdAt?: string;
   updatedAt?: string;
 }

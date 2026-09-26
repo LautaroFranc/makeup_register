@@ -39,7 +39,8 @@ const OrderSessionSchema = new Schema<IOrderSession>(
   { timestamps: true }
 );
 
-// Índices para optimizar las búsquedas de cron jobs
+// Índices para las agregaciones del embudo de /api/analytics/dashboard
+// (los carritos abandonados se derivan en lectura, no hay cron que los marque)
 OrderSessionSchema.index({ status: 1, createdAt: 1 });
 
 const OrderSession: Model<IOrderSession> =
