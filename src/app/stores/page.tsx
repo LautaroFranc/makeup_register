@@ -41,6 +41,7 @@ import {
   Palette,
   Users,
   BarChart3,
+  Shield,
 } from "lucide-react";
 
 interface Store {
@@ -83,6 +84,8 @@ interface Store {
     showStock: boolean;
     enableSearch: boolean;
     enableFilters: boolean;
+    allowedDomains?: string[];
+    integrationToken?: string;
   };
   paymentMethods: {
     directSale: {
@@ -167,6 +170,8 @@ export default function StoresPage() {
       showStock: true,
       enableSearch: true,
       enableFilters: true,
+      allowedDomains: [] as string[],
+      integrationToken: "",
     },
     paymentMethods: {
       directSale: {
@@ -282,6 +287,8 @@ export default function StoresPage() {
             showStock: true,
             enableSearch: true,
             enableFilters: true,
+            allowedDomains: [] as string[],
+            integrationToken: "",
           },
           paymentMethods: {
             directSale: {
@@ -401,6 +408,8 @@ export default function StoresPage() {
         showStock: fullStoreData.settings?.showStock ?? true,
         enableSearch: fullStoreData.settings?.enableSearch ?? true,
         enableFilters: fullStoreData.settings?.enableFilters ?? true,
+        allowedDomains: fullStoreData.settings?.allowedDomains || [],
+        integrationToken: fullStoreData.settings?.integrationToken || "",
       },
       paymentMethods: {
         directSale: {
@@ -1237,6 +1246,62 @@ export default function StoresPage() {
                       />
                     </div>
                   </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Tab: Ajustes de Seguridad */}
+            <TabsContent value="settings" className="space-y-4">
+              <div className="space-y-4">
+                <div className="bg-amber-50 border border-amber-200 p-4 rounded-md">
+                  <h4 className="font-semibold text-amber-800 flex items-center gap-2">
+                    <Shield className="h-4 w-4" /> Configuración de Seguridad
+                  </h4>
+                  <p className="text-sm text-amber-700 mt-1">
+                    Estos ajustes protegen la ruta pública de ventas de tu tienda para evitar compras no autorizadas.
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="edit-integrationToken">Token Público de Integración</Label>
+                  <Input
+                    id="edit-integrationToken"
+                    value={storeFormData.settings?.integrationToken || ""}
+                    onChange={(e) =>
+                      setStoreFormData({
+                        ...storeFormData,
+                        settings: {
+                          ...storeFormData.settings,
+                          integrationToken: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="ej: token-secreto-123"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Si configuras esto, deberás enviarlo en las cabeceras (Authorization: Bearer token-secreto-123) al usar la API.
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="edit-allowedDomains">Dominios Permitidos (CORS)</Label>
+                  <Input
+                    id="edit-allowedDomains"
+                    value={storeFormData.settings?.allowedDomains?.join(", ") || ""}
+                    onChange={(e) =>
+                      setStoreFormData({
+                        ...storeFormData,
+                        settings: {
+                          ...storeFormData.settings,
+                          allowedDomains: e.target.value.split(",").map(d => d.trim()).filter(d => d),
+                        },
+                      })
+                    }
+                    placeholder="https://mi-pagina.com, http://localhost:3000"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Separa los dominios con comas. Si lo dejas vacío, cualquier dominio podrá realizar peticiones.
+                  </p>
                 </div>
               </div>
             </TabsContent>
