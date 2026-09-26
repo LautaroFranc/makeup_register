@@ -19,6 +19,7 @@ import {
   FolderTree,
   ChevronDown,
   Sparkles,
+  BarChart3,
 } from "lucide-react";
 
 import {
@@ -56,6 +57,11 @@ const menuGroups = [
         title: "Tiendas",
         url: "/stores",
         icon: Store,
+      },
+      {
+        title: "Analíticas",
+        url: "/analytics",
+        icon: BarChart3,
       },
     ],
   },
