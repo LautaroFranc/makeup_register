@@ -60,6 +60,8 @@ export interface IStore extends Document {
     enableFilters: boolean;
     welcomeEmailSubject?: string;
     welcomeEmailTemplate?: string;
+    allowedDomains?: string[]; // Dominios permitidos para CORS
+    integrationToken?: string; // Token público de integración
   };
 
   // Métodos de pago
@@ -258,6 +260,14 @@ const StoreSchema: Schema<IStore> = new Schema(
         default: "¡Gracias por registrarte!",
       },
       welcomeEmailTemplate: {
+        type: String,
+        default: "",
+      },
+      allowedDomains: {
+        type: [String],
+        default: [],
+      },
+      integrationToken: {
         type: String,
         default: "",
       },

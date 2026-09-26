@@ -53,6 +53,10 @@ function NovedadesFormContent() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [sending, setSending] = useState(false);
 
+  // Email de prueba
+  const [testEmail, setTestEmail] = useState("");
+  const [sendingTest, setSendingTest] = useState(false);
+
   // Datos reales cargados para la vista previa
   const [realProducts, setRealProducts] = useState<any[]>([]);
   const [storeName, setStoreName] = useState("Nuestra Tienda");
@@ -227,6 +231,50 @@ function NovedadesFormContent() {
     }
   };
 
+  const handleSendTest = async () => {
+    if (!subject.trim()) {
+      toast({ title: "Asunto requerido", description: "Por favor ingresa el asunto del correo.", variant: "destructive" });
+      return;
+    }
+    if (!content.trim()) {
+      toast({ title: "Mensaje requerido", description: "Por favor escribe el contenido de la novedad.", variant: "destructive" });
+      return;
+    }
+    if (!testEmail.trim() || !testEmail.includes("@")) {
+      toast({ title: "Email de prueba inválido", description: "Por favor ingresa un correo válido para la prueba.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setSendingTest(true);
+      const token = localStorage.getItem("token");
+
+      const res = await fetch("/api/leads/send-newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          subject,
+          content,
+          isHtml: isHtmlMode,
+          isTest: true,
+          testEmail: testEmail.trim()
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        toast({ title: "¡Prueba enviada!", description: data.message || `Correo de prueba enviado a ${testEmail}` });
+      } else {
+        toast({ title: "Error al enviar prueba", description: data.error || "Ocurrió un error.", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error inesperado", description: "Error de red al intentar enviar la prueba.", variant: "destructive" });
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -360,8 +408,8 @@ function NovedadesFormContent() {
   });
 
   return (
-    <div className="container mx-auto p-4 md:p-6 max-w-6xl space-y-6">
-      <div className="flex items-center gap-4">
+    <div className="container mx-auto p-2 sm:p-4 md:p-6 max-w-6xl space-y-4 md:space-y-6">
+      <div className="flex items-center gap-3">
         <Button
           variant="outline"
           size="icon"
@@ -370,31 +418,31 @@ function NovedadesFormContent() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-primary" /> Redactar Novedad & Promoción
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+            <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> Redactar Novedad & Promoción
           </h1>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground text-xs sm:text-sm">
             Usa las etiquetas inteligentes como <strong>{"{productos_recientes}"}</strong> para cargar tus productos automáticamente.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Columna Izquierda: Formulario y Editor */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
               <Mail className="h-5 w-5 text-primary" /> Contenido del Email
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               Configura los destinatarios, variables e imágenes de tu correo.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0 space-y-6">
             <form onSubmit={handleSend} className="space-y-5">
               {/* Destinatarios */}
-              <div className="space-y-3 border p-4 rounded-lg bg-muted/20">
-                <Label className="font-semibold text-sm">Destinatarios</Label>
+              <div className="space-y-3 border p-3 sm:p-4 rounded-lg bg-muted/20">
+                <Label className="font-semibold text-xs sm:text-sm">Destinatarios</Label>
                 <div className="space-y-2">
                   <label className="flex items-center space-x-3 cursor-pointer">
                     <input
@@ -405,7 +453,7 @@ function NovedadesFormContent() {
                       onChange={() => setTargetType("all")}
                       className="h-4 w-4 text-primary focus:ring-primary"
                     />
-                    <span className="text-sm font-normal">
+                    <span className="text-xs sm:text-sm font-normal">
                       Enviar a <strong>TODOS</strong> los clientes con email
                     </span>
                   </label>
@@ -426,7 +474,7 @@ function NovedadesFormContent() {
                       onChange={() => setTargetType("selected")}
                       className="h-4 w-4 text-primary focus:ring-primary"
                     />
-                    <span className="text-sm font-normal">
+                    <span className="text-xs sm:text-sm font-normal">
                       Enviar a <strong>clientes seleccionados</strong> ({selectedLeadIds.length})
                     </span>
                   </label>
@@ -440,7 +488,7 @@ function NovedadesFormContent() {
                     <Sparkles className="h-4 w-4 text-purple-600" />
                     Etiquetas Variables (Insertar al hacer clic)
                   </Label>
-                  <span className="text-[10px] text-purple-600 font-medium">Haz clic para agregar</span>
+                  <span className="text-[10px] text-purple-600 font-medium hidden sm:inline">Haz clic para agregar</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5 pt-0.5">
                   <Button
@@ -548,7 +596,7 @@ function NovedadesFormContent() {
 
               {/* Asunto */}
               <div className="space-y-2">
-                <Label htmlFor="subject">Asunto del Correo *</Label>
+                <Label htmlFor="subject" className="text-xs sm:text-sm font-medium">Asunto del Correo *</Label>
                 <Input
                   id="subject"
                   placeholder="Ej: ¡Descubre nuestras novedades de la semana!"
@@ -559,7 +607,7 @@ function NovedadesFormContent() {
               </div>
 
               {/* Barra de herramientas: Modo HTML & Subir Imagen a Cloudinary */}
-              <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/40 p-2.5 rounded-lg border">
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/40 p-2 sm:p-2.5 rounded-lg border">
                 <div className="flex items-center gap-2">
                   <Button
                     type="button"
@@ -591,7 +639,7 @@ function NovedadesFormContent() {
                   >
                     <Upload className="h-3.5 w-3.5" />
                     {uploadingImage
-                      ? "Subiendo a Cloudinary..."
+                      ? "Subiendo..."
                       : "Subir Imagen (Cloudinary)"}
                   </Button>
                 </div>
@@ -599,7 +647,7 @@ function NovedadesFormContent() {
 
               {/* Mensaje */}
               <div className="space-y-2">
-                <Label htmlFor="content">
+                <Label htmlFor="content" className="text-xs sm:text-sm font-medium">
                   {isHtmlMode
                     ? "Contenido del Correo (soporta HTML y variables) *"
                     : "Contenido / Mensaje *"}
@@ -609,31 +657,55 @@ function NovedadesFormContent() {
                   placeholder={
                     "Hola! Te invitamos a conocer nuestras últimas novedades:\n\n{productos_recientes}\n\n{catalogo}"
                   }
-                  rows={9}
-                  className="font-mono text-sm"
+                  rows={8}
+                  className="font-mono text-xs sm:text-sm"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   required
                 />
               </div>
 
-              {/* Botones de Acción */}
-              <div className="flex justify-end gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.push("/leads")}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={sending}
-                  className="flex items-center gap-2"
-                >
-                  <Send className="h-4 w-4" />
-                  {sending ? "Enviando correos..." : "Enviar Novedad"}
-                </Button>
+              {/* Botones de Acción y Prueba */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2 border-t mt-4">
+                
+                {/* Enviar Prueba */}
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Input 
+                    type="email"
+                    placeholder="Email de prueba" 
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                    className="h-9 text-xs sm:text-sm w-full sm:w-48"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={sendingTest}
+                    onClick={handleSendTest}
+                    className="h-9 whitespace-nowrap"
+                  >
+                    {sendingTest ? "Enviando..." : "Enviar Prueba"}
+                  </Button>
+                </div>
+
+                <div className="flex justify-end gap-3 w-full sm:w-auto">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => router.push("/leads")}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={sending}
+                    className="flex items-center gap-2"
+                  >
+                    <Send className="h-4 w-4" />
+                    {sending ? "Enviando..." : "Enviar Novedad"}
+                  </Button>
+                </div>
               </div>
             </form>
           </CardContent>
@@ -641,25 +713,25 @@ function NovedadesFormContent() {
 
         {/* Columna Derecha: Vista Previa del Email en Tiempo Real */}
         <Card className="flex flex-col h-full">
-          <CardHeader className="pb-3 border-b">
-            <CardTitle className="text-lg flex items-center justify-between">
+          <CardHeader className="p-3 sm:p-4 border-b">
+            <CardTitle className="text-base sm:text-lg flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <Eye className="h-5 w-5 text-primary" /> Vista Previa en Vivo
               </span>
-              <span className="text-xs font-normal text-muted-foreground border px-2 py-0.5 rounded bg-muted">
-                Transformación en tiempo real
+              <span className="text-[10px] sm:text-xs font-normal text-muted-foreground border px-2 py-0.5 rounded bg-muted">
+                Tiempo real
               </span>
             </CardTitle>
-            <CardDescription className="truncate">
+            <CardDescription className="truncate text-xs sm:text-sm">
               <strong>Asunto:</strong> {subject || "(Sin asunto)"}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 p-3 bg-muted/20 min-h-[450px]">
-            <div className="w-full h-full min-h-[420px] rounded-lg border bg-white overflow-hidden shadow-xs">
+          <CardContent className="flex-1 p-1 sm:p-3 bg-muted/20 min-h-[360px] md:min-h-[450px]">
+            <div className="w-full h-full min-h-[350px] md:min-h-[420px] rounded-lg border bg-white overflow-hidden shadow-xs">
               <iframe
                 title="Vista Previa de Email"
                 srcDoc={previewHtml}
-                className="w-full h-full min-h-[420px] border-0"
+                className="w-full h-full min-h-[350px] md:min-h-[420px] border-0"
               />
             </div>
           </CardContent>

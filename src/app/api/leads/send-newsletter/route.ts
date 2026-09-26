@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
     const userId = decoded.userId;
     const body = await req.json();
-    const { subject, content, isHtml, targetType, selectedLeadIds } = body;
+    const { subject, content, isHtml, targetType, selectedLeadIds, isTest, testEmail } = body;
 
     if (!subject || !subject.trim()) {
       return NextResponse.json(
@@ -42,34 +42,47 @@ export async function POST(req: NextRequest) {
     const storeObj = await Store.findOne({ user: userId });
     const storeName = storeObj?.name || userObj?.name || "Nuestra Tienda";
 
-    let query: any = { user: userId, email: { $exists: true, $ne: "" } };
+    let recipientEmails: string[] = [];
 
-    // Si seleccionó enviar solo a clientes específicos
-    if (
-      targetType === "selected" &&
-      Array.isArray(selectedLeadIds) &&
-      selectedLeadIds.length > 0
-    ) {
-      query._id = { $in: selectedLeadIds };
-    }
+    if (isTest || (testEmail && typeof testEmail === "string" && testEmail.trim())) {
+      const cleanTest = testEmail?.trim();
+      if (!cleanTest || !cleanTest.includes("@")) {
+        return NextResponse.json(
+          { success: false, error: "Ingresa un correo electrónico de prueba válido" },
+          { status: 400 }
+        );
+      }
+      recipientEmails = [cleanTest];
+    } else {
+      let query: any = { user: userId, email: { $exists: true, $ne: "" } };
 
-    const leads = await Lead.find(query).select("email name");
+      // Si seleccionó enviar solo a clientes específicos
+      if (
+        targetType === "selected" &&
+        Array.isArray(selectedLeadIds) &&
+        selectedLeadIds.length > 0
+      ) {
+        query._id = { $in: selectedLeadIds };
+      }
 
-    const recipientEmails = leads
-      .map((lead) => lead.email?.trim())
-      .filter((email): email is string =>
-        Boolean(email && email.includes("@")),
-      );
+      const leads = await Lead.find(query).select("email name");
 
-    if (recipientEmails.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "No se encontraron clientes con direcciones de correo válidas para enviar.",
-        },
-        { status: 400 },
-      );
+      recipientEmails = leads
+        .map((lead) => lead.email?.trim())
+        .filter((email): email is string =>
+          Boolean(email && email.includes("@")),
+        );
+
+      if (recipientEmails.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "No se encontraron clientes con direcciones de correo válidas para enviar.",
+          },
+          { status: 400 },
+        );
+      }
     }
 
     // Enviar correos

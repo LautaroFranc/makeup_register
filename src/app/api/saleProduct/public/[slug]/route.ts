@@ -31,6 +31,33 @@ export async function POST(
       // Se encontró tienda, usar su usuario
       userId = store.user.toString();
       storeId = store._id.toString();
+
+      // Validación 1: Dominios Permitidos (CORS Dinámico)
+      const origin = req.headers.get("origin") || req.headers.get("referer") || "";
+      const allowedDomains = store.settings?.allowedDomains || [];
+      if (allowedDomains.length > 0) {
+        const isAllowed = allowedDomains.some((domain: string) => 
+          origin.includes(domain)
+        );
+        if (!isAllowed) {
+          return NextResponse.json(
+            { success: false, message: "Dominio no autorizado para registrar ventas (CORS restringido)" },
+            { status: 403 },
+          );
+        }
+      }
+
+      // Validación 2: Token Público de Integración
+      const integrationToken = store.settings?.integrationToken;
+      if (integrationToken && integrationToken.trim() !== "") {
+        const authHeader = req.headers.get("authorization");
+        if (!authHeader || authHeader !== `Bearer ${integrationToken}`) {
+          return NextResponse.json(
+            { success: false, message: "Token de integración inválido o faltante" },
+            { status: 401 },
+          );
+        }
+      }
     } else {
       // Si no se encuentra tienda, buscar por slug de usuario (retrocompatibilidad)
       const user = await Users.findOne({ slug });
