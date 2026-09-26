@@ -1,20 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import Store from "@/models/Store";
 import Product from "@/models/Product";
-import OrderSession, { IOrderSession } from "@/models/OrderSession";
+import OrderSession from "@/models/OrderSession";
 import connectDB from "@/config/db";
 import { authMiddleware } from "../../middleware";
 
 const STALE_PAYMENT_MS = 1000 * 60 * 60 * 2; // 2 horas
 
 // Un carrito cuenta como abandonado si fue marcado así, o si quedó en
-// PAYMENT_INITIATED hace más de 2 horas. Es una función (y no un objeto
-// constante) para que el umbral se recalcule en cada request y no se congele
-// al arrancar el servidor.
-const isAbandonedFilter = () => ({
+// PAYMENT_INITIATED hace más de 2 horas.
+//
+// Son DOS sintaxis distintas y no intercambiables: en un filtro de query se
+// compara contra el campo directamente, pero dentro de un $cond (expresión de
+// agregación) los operadores exigen forma array. Reusar el filtro de query en la
+// agregación hace fallar con "Expression $lt takes exactly 2 arguments".
+// Ambas son funciones para que el umbral se recalcule en cada request y no se
+// congele al arrancar el servidor.
+const staleBefore = () => new Date(Date.now() - STALE_PAYMENT_MS);
+
+// Filtro de query (find)
+const abandonedFilter = () => ({
   $or: [
     { status: "ABANDONED" },
-    { status: "PAYMENT_INITIATED", updatedAt: { $lt: new Date(Date.now() - STALE_PAYMENT_MS) } },
+    { status: "PAYMENT_INITIATED", updatedAt: { $lt: staleBefore() } },
+  ],
+});
+
+// Expresión de agregación ($cond)
+const abandonedExpr = () => ({
+  $or: [
+    { $eq: ["$status", "ABANDONED"] },
+    {
+      $and: [
+        { $eq: ["$status", "PAYMENT_INITIATED"] },
+        { $lt: ["$updatedAt", staleBefore()] },
+      ],
+    },
   ],
 });
 
@@ -63,7 +84,7 @@ export async function GET(req: NextRequest) {
           },
           completed: { $sum: { $cond: [{ $eq: ["$status", "COMPLETED"] }, 1, 0] } },
           abandoned: {
-            $sum: { $cond: [isAbandonedFilter(), 1, 0] },
+            $sum: { $cond: [abandonedExpr(), 1, 0] },
           },
         },
       },
@@ -101,13 +122,16 @@ export async function GET(req: NextRequest) {
       totalProductViews > 0 ? ((completed / totalProductViews) * 100).toFixed(1) : "0.0";
 
     // 4. Últimos carritos recuperables (solo 5 documentos)
+    // Ojo: .lean() sin argumentos. El genérico de .lean<T>() se borra en
+    // compilación, y en Mongoose 8 `lean = arguments.length ? v : true` deja la
+    // opción en undefined (falsy) en vez de true, hydrateando los documentos.
     const recentAbandoned = await OrderSession.find({
       storeId: { $in: storeIds },
-      ...isAbandonedFilter(),
+      ...abandonedFilter(),
     })
       .sort({ updatedAt: -1 })
       .limit(5)
-      .lean<IOrderSession[]>();
+      .lean();
 
     return NextResponse.json({
       success: true,
