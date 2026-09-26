@@ -42,6 +42,7 @@ import {
   Users,
   BarChart3,
   Shield,
+  Key,
 } from "lucide-react";
 
 interface Store {
@@ -1265,20 +1266,41 @@ export default function StoresPage() {
 
                 <div>
                   <Label htmlFor="edit-integrationToken">Token Público de Integración</Label>
-                  <Input
-                    id="edit-integrationToken"
-                    value={storeFormData.settings?.integrationToken || ""}
-                    onChange={(e) =>
-                      setStoreFormData({
-                        ...storeFormData,
-                        settings: {
-                          ...storeFormData.settings,
-                          integrationToken: e.target.value,
-                        },
-                      })
-                    }
-                    placeholder="ej: token-secreto-123"
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id="edit-integrationToken"
+                      value={storeFormData.settings?.integrationToken || ""}
+                      onChange={(e) =>
+                        setStoreFormData({
+                          ...storeFormData,
+                          settings: {
+                            ...storeFormData.settings,
+                            integrationToken: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="ej: token-secreto-123"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => {
+                        const array = new Uint32Array(3);
+                        window.crypto.getRandomValues(array);
+                        const randomToken = "sk_live_" + Array.from(array).map(b => b.toString(36)).join("");
+                        setStoreFormData({
+                          ...storeFormData,
+                          settings: {
+                            ...storeFormData.settings,
+                            integrationToken: randomToken,
+                          },
+                        })
+                      }}
+                    >
+                      <Key className="w-4 h-4 mr-2" />
+                      Generar
+                    </Button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
                     Si configuras esto, deberás enviarlo en las cabeceras (Authorization: Bearer token-secreto-123) al usar la API.
                   </p>
