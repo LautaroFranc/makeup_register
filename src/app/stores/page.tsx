@@ -953,9 +953,10 @@ export default function StoresPage() {
           </DialogHeader>
 
           <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="basic">Básico</TabsTrigger>
               <TabsTrigger value="design">Diseño</TabsTrigger>
+              <TabsTrigger value="settings">Ajustes</TabsTrigger>
               <TabsTrigger value="contact">Contacto</TabsTrigger>
               <TabsTrigger value="payments">Pagos</TabsTrigger>
             </TabsList>
