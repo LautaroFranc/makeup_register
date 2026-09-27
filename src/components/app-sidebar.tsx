@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Sparkles,
   BarChart3,
+  Eye,
 } from "lucide-react";
 
 import {
@@ -60,8 +61,19 @@ const menuGroups = [
       },
       {
         title: "Analíticas",
-        url: "/analytics",
         icon: BarChart3,
+        subItems: [
+          {
+            title: "Embudo de Ventas",
+            url: "/analytics",
+            icon: BarChart3,
+          },
+          {
+            title: "Vistas por Producto",
+            url: "/analytics/productos",
+            icon: Eye,
+          },
+        ],
       },
     ],
   },
