@@ -14,11 +14,13 @@ import { CategorySelector } from "@/components/CategorySelect";
 import { ImageUploadSquare } from "@/components/ImageUploadSquare";
 import { DynamicAttributes } from "@/components/DynamicAttributes";
 import { StorePreviewButton } from "@/components/StorePreviewButton";
-import { Check, ChevronRight, ChevronLeft, Save } from "lucide-react";
+import { ImportProductsModal } from "@/components/ImportProductsModal";
+import { Check, ChevronRight, ChevronLeft, Save, FileSpreadsheet } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const ProductForm = () => {
   const [step, setStep] = useState(1);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const totalSteps = 4;
   const steps = [
     { num: 1, title: "Básicos" },
@@ -151,9 +153,28 @@ const ProductForm = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white shadow-md rounded-md animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <ImportProductsModal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onSuccess={() => {
+          toast({ description: "Productos importados exitosamente!", variant: "default" });
+        }}
+      />
+
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold">Crear Nuevo Producto</h2>
         <p className="text-gray-500">Completa la información del producto paso a paso.</p>
+        <div className="mt-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setImportModalOpen(true)}
+            className="border-green-400 text-green-700 hover:bg-green-50 hover:border-green-500"
+          >
+            <FileSpreadsheet className="w-4 h-4 mr-2" />
+            Importar desde Excel
+          </Button>
+        </div>
       </div>
 
       {/* Progress Bar / Steps */}
