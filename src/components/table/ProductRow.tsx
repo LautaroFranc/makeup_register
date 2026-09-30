@@ -12,6 +12,8 @@ import {
   EyeOff,
   Settings,
   Percent,
+  Package,
+  Loader2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -87,7 +89,18 @@ const ProductRow: React.FC<ProductRowProps> = ({
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
   const [localImages, setLocalImages] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  // ── Stock inline editing ────────────────────────────────────────────
+  const [isEditingStock, setIsEditingStock] = useState(false);
+  const [stockValue, setStockValue] = useState<string>(String(product.stock));
+  const [isSavingStock, setIsSavingStock] = useState(false);
   const { toast } = useToast();
+
+  // Sincronizar stockValue si el producto cambia desde afuera (ej: venta)
+  useEffect(() => {
+    if (!isEditingStock) {
+      setStockValue(String(product.stock));
+    }
+  }, [product.stock, isEditingStock]);
 
   // Inicializar imágenes locales cuando cambie el producto
   useEffect(() => {
@@ -266,6 +279,56 @@ const ProductRow: React.FC<ProductRowProps> = ({
     },
     [product._id, product, onProductUpdate, toast]
   );
+  const handleSaveStock = async () => {
+    const newStock = parseInt(stockValue);
+    if (isNaN(newStock) || newStock < 0) {
+      setStockValue(String(product.stock));
+      setIsEditingStock(false);
+      return;
+    }
+    if (newStock === product.stock) {
+      setIsEditingStock(false);
+      return;
+    }
+    setIsSavingStock(true);
+    try {
+      const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append("stock", String(newStock));
+      formData.append("name", product.name);
+      formData.append("description", product.name);
+      formData.append("buyPrice", product.buyPrice);
+      formData.append("sellPrice", product.sellPrice);
+      formData.append("wholesalePrice", product.wholesalePrice || "0");
+      formData.append("category", product.category);
+      formData.append("attributes", JSON.stringify(product.attributes || {}));
+      formData.append("published", String(product.published));
+      formData.append("removedImages", "[]");
+
+      const response = await fetch(`/api/products?id=${product._id}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const result = await response.json();
+      if (result.success) {
+        if (onProductUpdate) {
+          onProductUpdate(product._id, { ...product, stock: newStock });
+        }
+        toast({ description: `Stock actualizado a ${newStock}`, variant: "default" });
+      } else {
+        setStockValue(String(product.stock));
+        toast({ description: result.error || "Error al actualizar stock", variant: "destructive" });
+      }
+    } catch {
+      setStockValue(String(product.stock));
+      toast({ description: "Error de conexión", variant: "destructive" });
+    } finally {
+      setIsSavingStock(false);
+      setIsEditingStock(false);
+    }
+  };
+
   return (
     <TableRow>
       <TableCell>
@@ -453,7 +516,50 @@ const ProductRow: React.FC<ProductRowProps> = ({
         </span>
       </TableCell>
       <TableCell>
-        <span className="font-medium">{product.stock}</span>
+        <div className="flex items-center gap-1 group">
+          {isEditingStock ? (
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min={0}
+                autoFocus
+                value={stockValue}
+                onChange={(e) => setStockValue(e.target.value)}
+                onBlur={handleSaveStock}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveStock();
+                  if (e.key === "Escape") {
+                    setStockValue(String(product.stock));
+                    setIsEditingStock(false);
+                  }
+                }}
+                className="w-16 h-7 text-center text-sm border border-blue-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-300"
+              />
+              {isSavingStock && (
+                <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsEditingStock(true)}
+              title="Clic para editar stock"
+              className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-semibold transition-colors cursor-pointer hover:ring-2 hover:ring-blue-300 ${
+                product.stock === 0
+                  ? "bg-red-100 text-red-700"
+                  : product.stock <= 5
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-gray-100 text-gray-800"
+              }`}
+            >
+              <Package className="h-3 w-3" />
+              {product.stock}
+              <span className="text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                ✎
+              </span>
+            </button>
+          )}
+        </div>
       </TableCell>
       <TableCell>
         {formatToARS(parseFloat(product.sellPrice) * product.stock)}
