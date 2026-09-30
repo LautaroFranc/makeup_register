@@ -334,17 +334,17 @@ export default function ProductViewsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Visitante (IP enmascarada)</TableHead>
+                      <TableHead>Visitante</TableHead>
                       <TableHead className="text-right">Vistas</TableHead>
                       <TableHead className="text-right">Última vez</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {viewersData.map((v, i) => {
-                      const ipMasked = v.ip === "unknown" ? "Desconocido" : v.ip.split(".").slice(0, 3).join(".") + ".xxx";
+                      const clientLabel = v.ip === "unknown" ? "Desconocido" : `Cliente ${i + 1}`;
                       return (
                         <TableRow key={i}>
-                          <TableCell className="font-mono text-sm text-gray-600">{ipMasked}</TableCell>
+                          <TableCell className="font-medium text-sm text-gray-700">{clientLabel}</TableCell>
                           <TableCell className="text-right font-medium">{v.views}</TableCell>
                           <TableCell className="text-right text-xs text-gray-500">
                             {new Date(v.lastView).toLocaleDateString("es-AR", {
