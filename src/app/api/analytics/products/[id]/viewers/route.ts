@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import ProductView from "@/models/ProductView";
 import Product from "@/models/Product";
 import connectDB from "@/config/db";
-import { authMiddleware } from "../../../middleware";
+import { authMiddleware } from "../../../../middleware";
 import mongoose from "mongoose";
 
 export async function GET(
