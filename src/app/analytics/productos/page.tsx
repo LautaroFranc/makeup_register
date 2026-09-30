@@ -14,8 +14,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useFetch } from "@/hooks/useFetch";
-import { ArrowLeft, Eye, EyeOff, RefreshCw, Search, TrendingUp } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, RefreshCw, Search, TrendingUp, Users } from "lucide-react";
 
 interface ProductViewsRow {
   _id: string;
@@ -45,6 +51,9 @@ export default function ProductViewsPage() {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("views");
   const [hideEmpty, setHideEmpty] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<ProductViewsRow | null>(null);
+  const [viewersData, setViewersData] = useState<any[]>([]);
+  const [loadingViewers, setLoadingViewers] = useState(false);
 
   const loadData = async () => {
     setRefreshing(true);
@@ -60,6 +69,26 @@ export default function ProductViewsPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleOpenDetails = async (product: ProductViewsRow) => {
+    setSelectedProduct(product);
+    setViewersData([]);
+    setLoadingViewers(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/analytics/products/${product._id}/viewers?days=30`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.success) {
+        setViewersData(json.viewers);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoadingViewers(false);
+    }
+  };
 
   const isBusy = loading || refreshing;
   const products = useMemo(() => data?.products ?? [], [data]);
@@ -202,6 +231,7 @@ export default function ProductViewsPage() {
                   <TableHead className="w-28">Estado</TableHead>
                   <TableHead className="w-24 text-right">Vistas</TableHead>
                   <TableHead className="w-48">% del total</TableHead>
+                  <TableHead className="w-20 text-center">Detalle</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -258,6 +288,16 @@ export default function ProductViewsPage() {
                         </span>
                       </div>
                     </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Ver detalle por cliente/IP"
+                        onClick={() => handleOpenDetails(product)}
+                      >
+                        <Users className="h-4 w-4 text-blue-600" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -273,6 +313,57 @@ export default function ProductViewsPage() {
           vistas del usuario.
         </p>
       )}
+
+      {/* Modal de Detalle de Visualizaciones */}
+      <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-blue-600" />
+              Detalle de vistas (Últimos 30 días)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <h3 className="font-semibold mb-4 text-gray-800">{selectedProduct?.name}</h3>
+            {loadingViewers ? (
+              <p className="text-center text-gray-500 py-4">Cargando...</p>
+            ) : viewersData.length === 0 ? (
+              <p className="text-center text-gray-500 py-4">No hay datos detallados para este producto.</p>
+            ) : (
+              <div className="max-h-[300px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Visitante (IP enmascarada)</TableHead>
+                      <TableHead className="text-right">Vistas</TableHead>
+                      <TableHead className="text-right">Última vez</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {viewersData.map((v, i) => {
+                      const ipMasked = v.ip === "unknown" ? "Desconocido" : v.ip.split(".").slice(0, 3).join(".") + ".xxx";
+                      return (
+                        <TableRow key={i}>
+                          <TableCell className="font-mono text-sm text-gray-600">{ipMasked}</TableCell>
+                          <TableCell className="text-right font-medium">{v.views}</TableCell>
+                          <TableCell className="text-right text-xs text-gray-500">
+                            {new Date(v.lastView).toLocaleDateString("es-AR", {
+                              day: "2-digit",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

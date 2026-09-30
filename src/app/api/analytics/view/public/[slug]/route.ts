@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Product from "@/models/Product";
 import Store from "@/models/Store";
+import ProductView from "@/models/ProductView";
 import connectDB from "@/config/db";
 
 // POST - Registrar vista de producto
@@ -25,8 +26,7 @@ export async function POST(
       return NextResponse.json({ success: false, message: "Tienda no encontrada" }, { status: 404 });
     }
 
-    // Solo guardamos un contador: el historial por fecha requiere otro modelo
-    // (p. ej. ProductView) que no se usa todavia.
+    // Incrementamos el contador total en el producto
     const product = await Product.findOneAndUpdate(
       { _id: productId, store: store._id.toString() },
       { $inc: { views: 1 } },
@@ -36,6 +36,18 @@ export async function POST(
     if (!product) {
       return NextResponse.json({ success: false, message: "Producto no encontrado en esta tienda" }, { status: 404 });
     }
+
+    // Obtener la IP del cliente desde la request
+    const viewerIp = req.ip || req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+    const userAgent = req.headers.get("user-agent") || "unknown";
+
+    // Registrar el evento de vista detallado
+    await ProductView.create({
+      product: product._id,
+      store: store._id,
+      viewerIp,
+      userAgent,
+    });
 
     return NextResponse.json({ success: true, views: product.views });
   } catch (error: any) {
