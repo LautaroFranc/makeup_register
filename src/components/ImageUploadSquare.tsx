@@ -3,8 +3,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Loader2 } from "lucide-react";
 import Image from "next/image";
+import { compressImages } from "@/lib/imageCompressor";
 
 interface ImageUploadSquareProps {
   images: string[];
@@ -22,6 +23,7 @@ export const ImageUploadSquare: React.FC<ImageUploadSquareProps> = ({
   onRemoveImage,
 }) => {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [compressing, setCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Limpiar preview URLs cuando uploadedImages se vacía (formulario reseteado)
@@ -40,13 +42,20 @@ export const ImageUploadSquare: React.FC<ImageUploadSquareProps> = ({
     };
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      const newUrls = newFiles.map((file) => URL.createObjectURL(file));
-
-      onUploadedImagesChange([...uploadedImages, ...newFiles]);
-      setPreviewUrls([...previewUrls, ...newUrls]);
+      const rawFiles = Array.from(e.target.files);
+      setCompressing(true);
+      try {
+        const compressed = await compressImages(rawFiles);
+        const newUrls = compressed.map((file) => URL.createObjectURL(file));
+        onUploadedImagesChange([...uploadedImages, ...compressed]);
+        setPreviewUrls([...previewUrls, ...newUrls]);
+      } finally {
+        setCompressing(false);
+        // Limpiar input para permitir reseleccionar el mismo archivo
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -95,10 +104,21 @@ export const ImageUploadSquare: React.FC<ImageUploadSquareProps> = ({
         {/* Cuadrado de carga */}
         <div className="relative inline-block">
           <div
-            className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-colors"
-            onClick={() => fileInputRef.current?.click()}
+            className={`w-24 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors ${
+              compressing
+                ? "border-blue-300 bg-blue-50 cursor-wait"
+                : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+            }`}
+            onClick={() => !compressing && fileInputRef.current?.click()}
           >
-            <Plus className="h-8 w-8 text-gray-400" />
+            {compressing ? (
+              <>
+                <Loader2 className="h-6 w-6 text-blue-400 animate-spin" />
+                <span className="text-xs text-blue-500 mt-1">Comprimiendo</span>
+              </>
+            ) : (
+              <Plus className="h-8 w-8 text-gray-400" />
+            )}
           </div>
           <input
             ref={fileInputRef}
@@ -151,8 +171,8 @@ export const ImageUploadSquare: React.FC<ImageUploadSquareProps> = ({
 
       {/* Información adicional */}
       <p className="text-xs text-gray-500">
-        Haz clic en el cuadrado con "+" para agregar imágenes. Máximo 5MB por
-        imagen.
+        Haz clic en el cuadrado con "+" para agregar imágenes. Las imágenes se
+        comprimen automáticamente antes de subirse.
       </p>
     </div>
   );

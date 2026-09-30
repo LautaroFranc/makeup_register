@@ -4,8 +4,9 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { X, Plus, Upload } from "lucide-react";
+import { X, Plus, Upload, Loader2 } from "lucide-react";
 import Image from "next/image";
+import { compressImages } from "@/lib/imageCompressor";
 
 interface MultiImageUploadProps {
   images: string[];
@@ -21,14 +22,20 @@ export const MultiImageUpload: React.FC<MultiImageUploadProps> = ({
   onUploadedImagesChange,
 }) => {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [compressing, setCompressing] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      const newUrls = newFiles.map((file) => URL.createObjectURL(file));
-
-      onUploadedImagesChange([...uploadedImages, ...newFiles]);
-      setPreviewUrls([...previewUrls, ...newUrls]);
+      const rawFiles = Array.from(e.target.files);
+      setCompressing(true);
+      try {
+        const compressed = await compressImages(rawFiles);
+        const newUrls = compressed.map((f) => URL.createObjectURL(f));
+        onUploadedImagesChange([...uploadedImages, ...compressed]);
+        setPreviewUrls([...previewUrls, ...newUrls]);
+      } finally {
+        setCompressing(false);
+      }
     }
   };
 
@@ -114,25 +121,36 @@ export const MultiImageUpload: React.FC<MultiImageUploadProps> = ({
           accept="image/*"
           multiple
           onChange={handleFileChange}
+          disabled={compressing}
           className="flex-1"
         />
         <Button
           type="button"
           variant="outline"
           size="sm"
+          disabled={compressing}
           onClick={() =>
             (
               document.querySelector('input[type="file"]') as HTMLInputElement
             )?.click()
           }
         >
-          <Upload className="h-4 w-4 mr-2" />
-          Subir
+          {compressing ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Comprimiendo...
+            </>
+          ) : (
+            <>
+              <Upload className="h-4 w-4 mr-2" />
+              Subir
+            </>
+          )}
         </Button>
       </div>
 
       <p className="text-xs text-gray-500">
-        Puedes subir múltiples imágenes a la vez. Máximo 5MB por imagen.
+        Podés subir múltiples imágenes. Se comprimen automáticamente antes de subirse.
       </p>
     </div>
   );
