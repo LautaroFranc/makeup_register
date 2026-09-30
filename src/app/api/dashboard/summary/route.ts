@@ -20,14 +20,19 @@ export async function GET(req: NextRequest) {
     // Calcular totales de inventario actual
     const productTotals = products.reduce(
       (acc, product) => {
-        const sellPrice = parseFloat(product.sellPrice);
-        const buyPrice = parseFloat(product.buyPrice);
-        const stock = product.stock;
+        const sellPrice = parseFloat(product.sellPrice) || 0;
+        const buyPrice  = parseFloat(product.buyPrice)  || 0;
+        const stock     = product.stock || 0;
+
+        // Precio base para el valor de inventario:
+        // si tiene precio de compra se usa ese (costo real),
+        // si no, se usa el precio de venta como fallback.
+        const basePrice = buyPrice > 0 ? buyPrice : sellPrice;
 
         return {
-          valorInventario: acc.valorInventario + sellPrice * stock,
-          costoInventario: acc.costoInventario + buyPrice * stock,
-          totalStock: acc.totalStock + stock,
+          valorInventario:  acc.valorInventario  + basePrice  * stock,
+          costoInventario:  acc.costoInventario  + buyPrice   * stock,
+          totalStock:       acc.totalStock        + stock,
         };
       },
       {
