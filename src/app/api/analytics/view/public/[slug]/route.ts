@@ -38,7 +38,10 @@ export async function POST(
     }
 
     // Obtener la IP del cliente desde la request
-    const viewerIp = req.ip || req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+    const viewerIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "unknown";
     const userAgent = req.headers.get("user-agent") || "unknown";
 
     // Registrar el evento de vista detallado
