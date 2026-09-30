@@ -21,11 +21,11 @@ const COLUMN_MAP: Record<string, string> = {
   "precio compra": "buyPrice",
   "precio de compra": "buyPrice",
   buyprice: "buyPrice",
-  "costo": "buyPrice",
+  costo: "buyPrice",
   "precio venta": "sellPrice",
   "precio de venta": "sellPrice",
   sellprice: "sellPrice",
-  "precio": "sellPrice",
+  precio: "sellPrice",
   "precio mayorista": "wholesalePrice",
   wholesaleprice: "wholesalePrice",
   stock: "stock",
@@ -52,6 +52,9 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const file = formData.get("file") as Blob | null;
+
+    // updateExisting: si "true" actualiza productos existentes, si "false" los omite
+    const updateExisting = formData.get("updateExisting") === "true";
 
     if (!file) {
       return NextResponse.json(
@@ -94,15 +97,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Obtener nombres de productos existentes para detectar duplicados
-    const existingProducts = await Product.find({ user: userId }).select("name");
-    const existingNames = new Set(
-      existingProducts.map((p) => p.name.toLowerCase().trim())
+    // Obtener productos existentes: mapa nombre.toLowerCase() → producto
+    const existingProductsList = await Product.find({ user: userId }).select("name _id code barcode");
+    const existingMap = new Map(
+      existingProductsList.map((p) => [p.name.toLowerCase().trim(), p])
     );
 
     const errors: { row: number; message: string }[] = [];
     const skipped: { row: number; name: string; reason: string }[] = [];
     const toCreate: any[] = [];
+    const toUpdate: { filter: any; data: any; name: string }[] = [];
+
+    // Rastrear nombres procesados en este Excel para evitar duplicados internos
+    const processedNames = new Set<string>();
 
     for (let i = 0; i < rawRows.length; i++) {
       const rawRow = rawRows[i];
@@ -121,9 +128,16 @@ export async function POST(req: NextRequest) {
       // Validar campos requeridos
       const name = String(row.name || "").trim();
       if (!name) {
-        errors.push({ row: rowNum, message: "El nombre del producto es requerido" });
+        errors.push({ row: rowNum, message: `Fila ${rowNum}: El nombre del producto es requerido` });
         continue;
       }
+
+      // Evitar duplicados dentro del mismo Excel
+      if (processedNames.has(name.toLowerCase())) {
+        skipped.push({ row: rowNum, name, reason: "Nombre duplicado en el mismo archivo" });
+        continue;
+      }
+      processedNames.add(name.toLowerCase());
 
       const category = String(row.category || "").trim();
       if (!category) {
@@ -145,18 +159,8 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // Verificar duplicado
-      if (existingNames.has(name.toLowerCase())) {
-        skipped.push({ row: rowNum, name, reason: "Ya existe un producto con este nombre" });
-        continue;
-      }
-
-      // Marcar nombre como ya registrado (por si hay duplicados en el mismo Excel)
-      existingNames.add(name.toLowerCase());
-
-      const wholesalePrice = parseFloat(
-        String(row.wholesalePrice || "0").replace(",", ".")
-      ) || 0;
+      const wholesalePrice =
+        parseFloat(String(row.wholesalePrice || "0").replace(",", ".")) || 0;
 
       const publishedRaw = String(row.published || "").toLowerCase().trim();
       const published =
@@ -167,7 +171,7 @@ export async function POST(req: NextRequest) {
         publishedRaw === "1" ||
         publishedRaw === "yes";
 
-      toCreate.push({
+      const productData = {
         name,
         description: String(row.description || "").trim(),
         category,
@@ -176,13 +180,28 @@ export async function POST(req: NextRequest) {
         wholesalePrice: String(wholesalePrice),
         stock,
         published,
-        attributes: {},
         user: userId,
         store: store._id.toString(),
-      });
+      };
+
+      const existing = existingMap.get(name.toLowerCase());
+
+      if (existing) {
+        if (updateExisting) {
+          toUpdate.push({
+            filter: { _id: existing._id, user: userId },
+            data: productData,
+            name,
+          });
+        } else {
+          skipped.push({ row: rowNum, name, reason: "Ya existe un producto con este nombre" });
+        }
+      } else {
+        toCreate.push(productData);
+      }
     }
 
-    // Crear productos en batch
+    // ── Crear nuevos productos ─────────────────────────────────────────
     let created = 0;
     const createErrors: { name: string; message: string }[] = [];
 
@@ -196,47 +215,91 @@ export async function POST(req: NextRequest) {
           barcode,
           image: null,
           images: [],
+          attributes: {},
           hasDiscount: false,
           discountPercentage: 0,
           discountedPrice: productData.sellPrice,
         });
         created++;
       } catch (err: any) {
-        createErrors.push({
-          name: productData.name,
-          message: err.code === 11000
-            ? "Código de barras duplicado, se regenerará"
-            : err.message,
-        });
-        // Reintentar con nuevo barcode si es duplicado de barcode
         if (err.code === 11000) {
+          // Reintentar con nuevo barcode
           try {
             const code = await generateUniqueProductCode();
             const barcode = generateArgentineBarcode("EAN13");
-            await Product.create({ ...productData, code, barcode, image: null, images: [], hasDiscount: false, discountPercentage: 0, discountedPrice: productData.sellPrice });
+            await Product.create({
+              ...productData,
+              code,
+              barcode,
+              image: null,
+              images: [],
+              attributes: {},
+              hasDiscount: false,
+              discountPercentage: 0,
+              discountedPrice: productData.sellPrice,
+            });
             created++;
-            createErrors.pop(); // Remover el error si el reintento fue exitoso
           } catch {
-            // Si falla de nuevo, dejar el error
+            createErrors.push({ name: productData.name, message: "Error al crear (barcode duplicado)" });
           }
+        } else {
+          createErrors.push({ name: productData.name, message: err.message });
         }
       }
     }
+
+    // ── Actualizar productos existentes ───────────────────────────────
+    let updated = 0;
+    const updateErrors: { name: string; message: string }[] = [];
+
+    for (const { filter, data, name } of toUpdate) {
+      try {
+        await Product.findOneAndUpdate(
+          filter,
+          {
+            $set: {
+              description: data.description,
+              category: data.category,
+              buyPrice: data.buyPrice,
+              sellPrice: data.sellPrice,
+              wholesalePrice: data.wholesalePrice,
+              stock: data.stock,
+              published: data.published,
+            },
+          },
+          { runValidators: true }
+        );
+        updated++;
+      } catch (err: any) {
+        updateErrors.push({ name, message: err.message });
+      }
+    }
+
+    const totalErrors =
+      errors.length + createErrors.length + updateErrors.length;
+
+    const messageParts: string[] = [];
+    if (created > 0) messageParts.push(`${created} creado(s)`);
+    if (updated > 0) messageParts.push(`${updated} actualizado(s)`);
+    if (skipped.length > 0) messageParts.push(`${skipped.length} omitido(s)`);
+    if (totalErrors > 0) messageParts.push(`${totalErrors} con error`);
 
     return NextResponse.json({
       success: true,
       summary: {
         total: rawRows.length,
         created,
+        updated,
         skipped: skipped.length,
-        errors: errors.length + createErrors.length,
+        errors: totalErrors,
       },
       skipped,
       errors: [
         ...errors,
         ...createErrors.map((e) => ({ row: -1, message: `${e.name}: ${e.message}` })),
+        ...updateErrors.map((e) => ({ row: -1, message: `${e.name}: ${e.message}` })),
       ],
-      message: `Importación completada: ${created} producto(s) creado(s)${skipped.length > 0 ? `, ${skipped.length} omitido(s) por duplicado` : ""}${errors.length > 0 ? `, ${errors.length} con errores` : ""}`,
+      message: `Importación completada: ${messageParts.join(", ")}.`,
     });
   } catch (error: any) {
     console.error("Error al importar productos:", error);

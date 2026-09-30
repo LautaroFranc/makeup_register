@@ -20,11 +20,13 @@ import {
   SkipForward,
   Download,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 
 interface ImportSummary {
   total: number;
   created: number;
+  updated: number;
   skipped: number;
   errors: number;
 }
@@ -53,6 +55,7 @@ export function ImportProductsModal({
   const [step, setStep] = useState<ModalStep>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [updateExisting, setUpdateExisting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -62,6 +65,7 @@ export function ImportProductsModal({
     setFile(null);
     setResult(null);
     setIsDragging(false);
+    setUpdateExisting(false);
   };
 
   const handleClose = () => {
@@ -101,6 +105,7 @@ export function ImportProductsModal({
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("updateExisting", String(updateExisting));
       const token = localStorage.getItem("token");
 
       const res = await fetch("/api/products/import", {
@@ -113,7 +118,7 @@ export function ImportProductsModal({
       setResult(data);
       setStep("result");
 
-      if (data.success && data.summary.created > 0) {
+      if (data.success && (data.summary.created > 0 || data.summary.updated > 0)) {
         onSuccess?.();
       }
     } catch {
@@ -377,6 +382,47 @@ export function ImportProductsModal({
               <Download className="w-4 h-4" /> Descargar plantilla Excel (.xlsx)
             </button>
 
+            {/* Toggle actualizar existentes */}
+            <div
+              className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                updateExisting
+                  ? "bg-purple-50 border-purple-300"
+                  : "bg-gray-50 border-gray-200"
+              }`}
+              onClick={() => setUpdateExisting((v) => !v)}
+            >
+              <div className="flex items-center gap-2">
+                <RefreshCw
+                  className={`w-4 h-4 ${
+                    updateExisting ? "text-purple-600" : "text-gray-400"
+                  }`}
+                />
+                <div>
+                  <p className={`text-sm font-medium ${
+                    updateExisting ? "text-purple-800" : "text-gray-700"
+                  }`}>
+                    Actualizar productos existentes
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {updateExisting
+                      ? "Los productos con el mismo nombre serán actualizados"
+                      : "Los productos con el mismo nombre serán omitidos"}
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`w-10 h-5 rounded-full relative transition-colors ${
+                  updateExisting ? "bg-purple-600" : "bg-gray-300"
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                    updateExisting ? "translate-x-5" : "translate-x-0.5"
+                  }`}
+                />
+              </div>
+            </div>
+
             {/* Acciones */}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={handleClose}>
@@ -410,12 +456,12 @@ export function ImportProductsModal({
             {/* Banner principal */}
             <div
               className={`p-4 rounded-xl text-center ${
-                result.summary.created > 0
+                result.summary.created > 0 || result.summary.updated > 0
                   ? "bg-green-50 border border-green-200"
                   : "bg-red-50 border border-red-200"
               }`}
             >
-              {result.summary.created > 0 ? (
+              {result.summary.created > 0 || result.summary.updated > 0 ? (
                 <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-green-500" />
               ) : (
                 <AlertCircle className="w-10 h-10 mx-auto mb-2 text-red-500" />
@@ -424,12 +470,12 @@ export function ImportProductsModal({
             </div>
 
             {/* Contadores */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-2">
               <div className="text-center p-3 bg-blue-50 rounded-lg">
                 <p className="text-2xl font-bold text-blue-700">
                   {result.summary.total}
                 </p>
-                <p className="text-xs text-gray-600">Total leídos</p>
+                <p className="text-xs text-gray-600">Total</p>
               </div>
               <div className="text-center p-3 bg-green-50 rounded-lg">
                 <p className="text-2xl font-bold text-green-700">
@@ -437,11 +483,17 @@ export function ImportProductsModal({
                 </p>
                 <p className="text-xs text-gray-600">Creados</p>
               </div>
+              <div className="text-center p-3 bg-purple-50 rounded-lg">
+                <p className="text-2xl font-bold text-purple-700">
+                  {result.summary.updated ?? 0}
+                </p>
+                <p className="text-xs text-gray-600">Actualizados</p>
+              </div>
               <div className="text-center p-3 bg-orange-50 rounded-lg">
                 <p className="text-2xl font-bold text-orange-700">
                   {result.summary.skipped + result.summary.errors}
                 </p>
-                <p className="text-xs text-gray-600">Omitidos / Errores</p>
+                <p className="text-xs text-gray-600">Omit. / Error</p>
               </div>
             </div>
 
