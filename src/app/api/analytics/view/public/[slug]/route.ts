@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import Product from "@/models/Product";
 import Store from "@/models/Store";
 import ProductView from "@/models/ProductView";
+import Campaign from "@/models/Campaign";
 import connectDB from "@/config/db";
+import { CAMPAIGN_COOKIE } from "@/track/cookies";
 
 // POST - Registrar vista de producto
 export async function POST(
@@ -44,10 +46,27 @@ export async function POST(
       "unknown";
     const userAgent = req.headers.get("user-agent") || "unknown";
 
+    // La campaña viene de la cookie que dejó /api/track/ingest. Es una
+    // ruta pública y sin auth, así que el valor NO se confía: se valida que
+    // la campaña sea de esta tienda. Sin esto, cualquiera podría colgar
+    // vistas de otra tienda con una cookie forjada (y un id malformado
+    // rompería el create con un 500).
+    let campaignId: string | undefined;
+    const cookieCampaign = req.cookies.get(CAMPAIGN_COOKIE)?.value;
+    if (cookieCampaign) {
+      const validCampaign = await Campaign.exists({
+        _id: cookieCampaign,
+        user: store.user,
+        store: store._id,
+      });
+      if (validCampaign) campaignId = cookieCampaign;
+    }
+
     // Registrar el evento de vista detallado
     await ProductView.create({
       product: product._id,
       store: store._id,
+      campaign: campaignId || undefined,
       viewerIp,
       userAgent,
     });

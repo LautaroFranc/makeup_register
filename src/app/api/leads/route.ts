@@ -3,8 +3,10 @@ import connectDB from "@/config/db";
 import Lead from "@/models/Lead";
 import Users from "@/models/Users";
 import Store from "@/models/Store";
+import Campaign from "@/models/Campaign";
 import { authMiddleware, verifyToken } from "../middleware";
 import { sendWelcomeEmail } from "@/lib/mailer";
+import { TOUCH_COOKIE, CAMPAIGN_COOKIE } from "@/track/cookies";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +80,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, email, phone, status, notes, source, slug } = body;
+    const { name, email, phone, status, notes, source, sourceDetail, campaign, slug } = body;
 
     if (!name || name.trim() === "") {
       return NextResponse.json(
@@ -118,6 +120,44 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Atribución. Hay dos caminos porque el formulario de la tienda vive
+    // en un iframe de otro dominio (/store/[slug] embebe customUrl), y en
+    // un POST cross-site la cookie SameSite=Lax no viaja. Por eso el
+    // parámetro explícito es el camino principal y la cookie el fallback.
+    //
+    // En ambos casos se valida que la campaña exista y sea de este user +
+    // store: un id forjado no puede colgar un lead de otra tienda.
+    let campaignId: string | undefined;
+    const requestedCampaign = campaign || req.cookies.get(CAMPAIGN_COOKIE)?.value;
+
+    if (requestedCampaign && targetStore) {
+      const validCampaign = await Campaign.exists({
+        _id: requestedCampaign,
+        user: targetUser._id,
+        store: targetStore._id,
+      });
+      if (validCampaign) campaignId = requestedCampaign;
+    }
+
+    // firstTouchAt es el momento del primer contacto, no el del alta del
+    // lead. La cookie mkt_touch guarda el timestamp del primer impacto; si
+    // no está (lead cargado directo, cookies bloqueadas) se usa la fecha
+    // actual y se deja así, sin inventar una fecha anterior.
+    let firstTouchAt = new Date();
+    if (campaignId) {
+      const touchRaw = req.cookies.get(TOUCH_COOKIE)?.value;
+      if (touchRaw) {
+        const touchMs = Number(decodeURIComponent(touchRaw));
+        if (Number.isFinite(touchMs) && touchMs > 0) {
+          const parsed = new Date(touchMs);
+          // Un timestamp en el futuro indica cookie manipulada: se ignora.
+          if (!Number.isNaN(parsed.getTime()) && parsed.getTime() <= Date.now()) {
+            firstTouchAt = parsed;
+          }
+        }
+      }
+    }
+
     const newLead = await Lead.create({
       name,
       email,
@@ -125,6 +165,9 @@ export async function POST(req: NextRequest) {
       status: status || "nuevo",
       notes,
       source: source || (slug ? "Tienda Web" : "Manual"),
+      sourceDetail: sourceDetail || (campaignId ? "campaña" : undefined),
+      campaign: campaignId,
+      firstTouchAt,
       slug: leadSlug || targetUser.slug,
       store: targetStore ? targetStore._id : undefined,
       user: targetUser._id,

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 
 interface StoreConfig {
   customUrl?: string;
@@ -9,12 +9,22 @@ interface StoreConfig {
 
 export default function PublicStorePage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
 
   const [store, setStore] = useState<StoreConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const [campaignId, setCampaignId] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop");
+
+  // UTM de la URL del preview, para reenviarlos al iframe de la tienda real.
+  const utmParams = new URLSearchParams();
+  ["utm_source", "utm_medium", "utm_campaign"].forEach((key) => {
+    const value = searchParams.get(key);
+    if (value) utmParams.set(key, value);
+  });
+  const utmQuery = utmParams.toString();
 
   useEffect(() => {
     const fetchStoreData = async () => {
@@ -24,6 +34,25 @@ export default function PublicStorePage() {
 
         const storeData = await configResponse.json();
         setStore(storeData);
+
+        // Registra/recupera la campaña y la deja en cookie. El id devuelto
+        // se reinyecta en el iframe para que el formulario de la tienda
+        // (otro dominio) pueda mandarlo explícitamente.
+        const trackResponse = await fetch("/api/track/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            slug,
+            utmSource: searchParams.get("utm_source"),
+            utmMedium: searchParams.get("utm_medium"),
+            utmCampaign: searchParams.get("utm_campaign"),
+          }),
+        });
+
+        if (trackResponse.ok) {
+          const trackData = await trackResponse.json();
+          if (trackData.campaign?.id) setCampaignId(trackData.campaign.id);
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -32,7 +61,15 @@ export default function PublicStorePage() {
     };
 
     fetchStoreData();
-  }, [slug]);
+  }, [slug, searchParams]);
+
+  const iframeSrc = useMemo(() => {
+    if (!store?.customUrl) return "";
+    const params = new URLSearchParams(utmQuery);
+    if (campaignId) params.set("campaign", campaignId);
+    const query = params.toString();
+    return query ? `${store.customUrl}${store.customUrl.includes("?") ? "&" : "?"}${query}` : store.customUrl;
+  }, [store, utmQuery, campaignId]);
 
   if (loading) {
     return (
@@ -77,14 +114,14 @@ export default function PublicStorePage() {
       {viewMode === "desktop" ? (
         //  🌐 MODO DESKTOP (pantalla completa)
         <iframe
-          src={store.customUrl}
+          src={iframeSrc}
           className="w-full h-[90vh] border rounded-lg shadow-lg"
         />
       ) : (
         // 📱 MODO MOBILE (vista previa de celular)
         <div className="w-[390px] h-[844px] bg-black rounded-[40px] p-3 shadow-xl border-4 border-black overflow-hidden">
           <iframe
-            src={store.customUrl}
+            src={iframeSrc}
             className="w-full h-full rounded-[30px] bg-white"
           />
         </div>

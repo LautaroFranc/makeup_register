@@ -21,6 +21,7 @@ import {
   Sparkles,
   BarChart3,
   Eye,
+  Megaphone,
 } from "lucide-react";
 
 import {
@@ -131,6 +132,11 @@ const menuGroups = [
         title: "Clientes & Leads",
         url: "/leads",
         icon: User,
+      },
+      {
+        title: "Marketing",
+        url: "/marketing",
+        icon: Megaphone,
       },
       {
         title: "Planificación",

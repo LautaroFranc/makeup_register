@@ -7,6 +7,9 @@ export interface ILead extends Document {
   status: "nuevo" | "contactado" | "interesado" | "cliente" | "inactivo";
   notes?: string;
   source?: string;
+  sourceDetail?: string;
+  campaign?: mongoose.Types.ObjectId | string;
+  firstTouchAt?: Date;
   store?: mongoose.Types.ObjectId | string;
   slug?: string;
   user: mongoose.Types.ObjectId | string;
@@ -44,6 +47,18 @@ const LeadSchema: Schema<ILead> = new Schema(
       trim: true,
       default: "Manual",
     },
+    sourceDetail: {
+      type: String,
+      trim: true,
+      lowercase: true,
+    },
+    campaign: {
+      type: Schema.Types.ObjectId,
+      ref: "Campaign",
+    },
+    firstTouchAt: {
+      type: Date,
+    },
     slug: {
       type: String,
       trim: true,
@@ -62,6 +77,8 @@ const LeadSchema: Schema<ILead> = new Schema(
     timestamps: true,
   }
 );
+
+LeadSchema.index({ user: 1, campaign: 1 });
 
 const Lead: Model<ILead> =
   mongoose.models.Lead || mongoose.model<ILead>("Lead", LeadSchema);
