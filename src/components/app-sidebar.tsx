@@ -140,7 +140,7 @@ const menuGroups = [
       },
       {
         title: "Planificación",
-        url: "#",
+        url: "/planificacion",
         icon: Calendar,
       },
       {
