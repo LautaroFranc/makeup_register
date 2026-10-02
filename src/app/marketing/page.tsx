@@ -43,6 +43,7 @@ import {
   UserCheck,
   Plus,
   RefreshCw,
+  Filter,
   AlertTriangle,
 } from "lucide-react";
 
@@ -204,10 +205,16 @@ export default function MarketingPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={loadData} disabled={loading}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Actualizar
+          <Link href="/marketing/embudo">
+          <Button variant="outline">
+            <Filter className="h-4 w-4 mr-2" />
+            Ver embudo
           </Button>
+        </Link>
+        <Button variant="outline" onClick={loadData} disabled={loading}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Actualizar
+        </Button>
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nueva campaña

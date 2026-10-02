@@ -1,10 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import connectDB from "@/config/db";
 import ContentPiece from "@/models/ContentPiece";
+import Campaign from "@/models/Campaign";
+import Lead from "@/models/Lead";
+import ProductView from "@/models/ProductView";
 import Store from "@/models/Store";
 import { authMiddleware } from "../middleware";
+import { formatPhoneForDisplay } from "@/lib/whatsapp";
+import { slugifyUtm } from "@/lib/utm";
 
 connectDB();
+
+// Una pieza de contenido ES una campaña. Reutilizamos la Campaign en vez de
+// inventar un segundo modelo de atribución: es lo que permite después
+// answering "qué post trajo clientes" con los números que ya existen.
+async function ensureCampaignForPiece(
+  title: string,
+  network: string,
+  userId: string,
+  storeId: mongoose.Types.ObjectId | string
+) {
+  const name = slugifyUtm(title);
+  if (!name) return null;
+
+  const existing = await Campaign.findOne({ user: userId, store: storeId, name });
+  if (existing) return existing;
+
+  return Campaign.create({
+    name,
+    channel: network,
+    utmMedium: "organic",
+    status: "activa",
+    user: userId,
+    store: storeId,
+  });
+}
 
 const VALID_NETWORKS = ["facebook", "whatsapp"];
 const VALID_FORMATS = ["post", "reel", "video", "story", "catalogo", "mensaje"];
@@ -66,12 +97,83 @@ export async function GET(req: NextRequest) {
       if (to) query.scheduledFor.$lte = new Date(`${to}T23:59:59.999`);
     }
 
-    const pieces = await ContentPiece.find(query).sort({
-      scheduledFor: 1,
-      createdAt: -1,
-    });
+    const pieces = await ContentPiece.find(query)
+      // La foto y el nombre del producto vienen poblados: la UI los muestra
+      // en la tarjeta para no tener que ir a buscar la imagen a Products.
+      .populate("product", "name image sellPrice")
+      .populate("promotion", "name type")
+      .populate("campaign", "name channel")
+      .sort({ scheduledFor: 1, createdAt: -1 });
 
-    return NextResponse.json({ success: true, pieces });
+    // Métricas de la campaña de cada pieza. Dos agregaciones en vez de una
+    // consulta por pieza: con 30 piezas en la grilla la alternativa son 60
+    // round-trips a Mongo.
+    const campaignIds = pieces.map((p) => p.campaign).filter(Boolean);
+
+    const [leadAgg, viewAgg] = await Promise.all([
+      campaignIds.length
+        ? Lead.aggregate([
+            { $match: { user: new mongoose.Types.ObjectId(String(_id)), campaign: { $in: campaignIds } } },
+            {
+              $group: {
+                _id: "$campaign",
+                leads: { $sum: 1 },
+                clientes: {
+                  $sum: { $cond: [{ $eq: ["$status", "cliente"] }, 1, 0] },
+                },
+              },
+            },
+          ])
+        : [],
+      campaignIds.length
+        ? ProductView.aggregate([
+            { $match: { campaign: { $in: campaignIds } } },
+            { $group: { _id: "$campaign", vistas: { $sum: 1 } } },
+          ])
+        : [],
+    ]);
+
+    const metricMap: Record<string, { leads: number; clientes: number; vistas: number }> = {};
+    for (const row of leadAgg) {
+      metricMap[String(row._id)] = {
+        leads: row.leads,
+        clientes: row.clientes,
+        vistas: 0,
+      };
+    }
+    for (const row of viewAgg) {
+      const key = String(row._id);
+      const prev = metricMap[key] || { leads: 0, clientes: 0, vistas: 0 };
+      metricMap[key] = { ...prev, vistas: row.vistas };
+    }
+
+    // Tras populate, campaign es un documento; si la pieza se guardó sin
+    // campaña puede venir como id plano. Normalizo las dos formas.
+    const campaignIdOf = (p: any): string | null => {
+      const c = p.campaign;
+      if (!c) return null;
+      return String(c._id ?? c);
+    };
+
+    return NextResponse.json({
+      success: true,
+      pieces: pieces.map((p) => ({
+        ...p.toObject(),
+        metrics: campaignIdOf(p)
+          ? metricMap[campaignIdOf(p)!] || { leads: 0, clientes: 0, vistas: 0 }
+          : null,
+      })),
+      // El link de WhatsApp se arma en el cliente: necesita el texto de la
+      // pieza, que el servidor no tiene.
+      whatsapp: store.paymentMethods?.directSale?.whatsapp || null,
+      whatsappDisplay: formatPhoneForDisplay(
+        store.paymentMethods?.directSale?.whatsapp
+      ),
+      // Base para armar el link de medición. Se prioriza customUrl (la
+      // tienda real donde cae la gente) y se cae al preview si no hay.
+      storeUrl: store.customUrl || null,
+      storeSlug: store.slug || null,
+    });
   } catch (error: any) {
     console.error("Error al listar contenido:", error);
     return NextResponse.json(
@@ -136,6 +238,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+        // Cada pieza queda atada a una campaña para poder medirla. Se hace
+    // find-or-create por slug del título, así reintentar no duplica.
+    const campaign = await ensureCampaignForPiece(
+      title,
+      network,
+      _id,
+      store._id
+    );
+
     const piece = await ContentPiece.create({
       title: title.trim(),
       copy,
@@ -147,6 +258,7 @@ export async function POST(req: NextRequest) {
       publishedAt: status === "publicado" ? new Date() : null,
       product: product || undefined,
       promotion: promotion || undefined,
+      campaign: campaign ? campaign._id : undefined,
       results: {
         reach: Number(results.reach) || 0,
         interactions: Number(results.interactions) || 0,
@@ -225,6 +337,14 @@ export async function PUT(req: NextRequest) {
     ];
     for (const field of fields) {
       if (body[field] !== undefined) (piece as any)[field] = body[field];
+    }
+
+    // Al editar NO se re-slubea la campaña aunque cambie el título: el slug es
+    // la identidad que ya está en los links publicados y en los leads
+    // guardados. Cambiarlo partiría las métricas en dos. Si querés empezar de
+    // cero para un título nuevo, borrá la pieza y creala de nuevo.
+    if (body.campaign !== undefined) {
+      piece.campaign = body.campaign || undefined;
     }
 
     if (body.scheduledFor !== undefined) {

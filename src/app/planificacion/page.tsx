@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -29,6 +29,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { buildWhatsappLink } from "@/lib/whatsapp";
+import { buildUtmQuery } from "@/lib/utm";
 import {
   Calendar,
   ChevronLeft,
@@ -41,6 +43,8 @@ import {
   MessageCircle,
   Lightbulb,
   Info,
+  Send,
+  Link2,
 } from "lucide-react";
 
 interface Piece {
@@ -54,6 +58,13 @@ interface Piece {
   scheduledFor: string | null;
   publishedAt: string | null;
   results: { reach: number; interactions: number };
+  // Poblado desde el servidor: la foto y el nombre real del producto, para
+  // ver la miniatura sin ir a buscarla.
+  product?: { _id: string; name: string; image?: string; sellPrice?: string } | null;
+  promotion?: { _id: string; name: string; type: string } | null;
+  campaign?: { _id: string; name: string; channel: string } | null;
+  // Leads/clientes/vistas que trajo esta pieza, vía su campaña.
+  metrics?: { leads: number; clientes: number; vistas: number } | null;
 }
 
 interface Idea {
@@ -142,6 +153,10 @@ export default function PlanificacionPage() {
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [pieces, setPieces] = useState<Piece[]>([]);
   const [backlog, setBacklog] = useState<Piece[]>([]);
+  const [whatsapp, setWhatsapp] = useState<string | null>(null);
+  const [whatsappDisplay, setWhatsappDisplay] = useState<string>("");
+  const [storeUrl, setStoreUrl] = useState<string | null>(null);
+  const [storeSlug, setStoreSlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [editing, setEditing] = useState<Piece | null>(null);
@@ -184,6 +199,10 @@ export default function PlanificacionPage() {
 
       setPieces(weekJson.pieces || []);
       setBacklog(backJson.success ? backJson.pieces || [] : []);
+      setWhatsapp(weekJson.whatsapp || null);
+      setWhatsappDisplay(weekJson.whatsappDisplay || "");
+      setStoreUrl(weekJson.storeUrl || null);
+      setStoreSlug(weekJson.storeSlug || null);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -216,7 +235,41 @@ export default function PlanificacionPage() {
 
   const isCurrentWeek = toISODate(weekStart) === toISODate(startOfWeek(new Date()));
 
+  // Base del link de medición: la tienda real si está configurada, si no el
+  // preview interno. La página se prerenderiza en el server, donde window no
+  // existe, así que el origin se resuelve solo en el cliente.
+  const baseStoreUrl = useMemo(() => {
+    if (storeUrl) return storeUrl;
+    if (storeSlug && typeof window !== "undefined") {
+      return `${window.location.origin}/store/${storeSlug}`;
+    }
+    return "";
+  }, [storeUrl, storeSlug]);
+
+  const measureUrl = useMemo(() => {
+    if (!editing?.campaign?.name) return "";
+    const query = buildUtmQuery({
+      source: editing.network,
+      medium: "organic",
+      campaign: editing.campaign.name,
+    });
+    return baseStoreUrl ? `${baseStoreUrl}${baseStoreUrl.includes("?") ? "&" : "?"}${query}` : query;
+  }, [editing, baseStoreUrl]);
+
   const weekLabel = `${weekStart.toLocaleDateString("es-AR", { day: "numeric", month: "short" })} – ${addDays(weekStart, 6).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}`;
+
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Copiado", description: label });
+    } catch {
+      toast({
+        title: "No se pudo copiar",
+        description: "Tu navegador bloqueó el portapapeles: copialo a mano.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const openNew = (day?: Date) => {
     setForm({
@@ -483,7 +536,34 @@ export default function PlanificacionPage() {
         </Card>
       </div>
 
-      <Card>
+      <div className="space-y-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-green-600" />
+              Botón de WhatsApp
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {whatsapp ? (
+              <p className="text-sm text-muted-foreground">
+                El botón de cada tarjeta abre WhatsApp con{" "}
+                <strong className="text-foreground">{whatsappDisplay}</strong>{" "}
+                y el texto ya escrito. Cambialo en{" "}
+                <strong>Tiendas → tu tienda → Contacto</strong>.
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No hay número de WhatsApp cargado, así que el botón no
+                aparece. Cargalo en{" "}
+                <strong>Tiendas → tu tienda → Contacto</strong> y las piezas
+                con texto listo se van a poder mandar directo.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
@@ -561,7 +641,16 @@ export default function PlanificacionPage() {
                         —
                       </p>
                     ) : (
-                      dayPieces.map((p) => <PieceCard key={p._id} piece={p} onEdit={openEdit} onDelete={deletePiece} />)
+                      dayPieces.map((p) => (
+                        <PieceCard
+                          key={p._id}
+                          piece={p}
+                          onEdit={openEdit}
+                          onDelete={deletePiece}
+                          whatsapp={whatsapp}
+                          whatsappDisplay={whatsappDisplay}
+                        />
+                      ))
                     )}
                   </div>
                 );
@@ -595,12 +684,20 @@ export default function PlanificacionPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {backlog.map((p) => (
-                <PieceCard key={p._id} piece={p} onEdit={openEdit} onDelete={deletePiece} />
+                <PieceCard
+                  key={p._id}
+                  piece={p}
+                  onEdit={openEdit}
+                  onDelete={deletePiece}
+                  whatsapp={whatsapp}
+                  whatsappDisplay={whatsappDisplay}
+                />
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* --- Editor --- */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
@@ -700,6 +797,35 @@ export default function PlanificacionPage() {
                 placeholder="Acá va el texto que vas a copiar y pegar."
               />
             </div>
+
+            {editing?.campaign?.name && (
+              <div className="space-y-2 rounded-md border border-dashed p-3">
+                <Label className="flex items-center gap-1.5">
+                  <Link2 className="h-3.5 w-3.5" />
+                  Link para medir esta pieza
+                </Label>
+                <code className="block text-[11px] bg-muted p-2 rounded break-all">
+                  {measureUrl}
+                </code>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    copyToClipboard(measureUrl, "Link de medición copiado")
+                  }
+                >
+                  Copiar link
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Ponelo en tu bio, en el post o en un link-in-bio. Con eso la
+                  app sabe cuántas visitas y cuántos leads trajo{" "}
+                  <strong>esta</strong> pieza y no otra.
+                  {editing.metrics && editing.metrics.vistas + editing.metrics.leads > 0
+                    ? ` Ahora mismo: ${editing.metrics.vistas} visitas, ${editing.metrics.leads} leads, ${editing.metrics.clientes} clientes.`
+                    : " Todavía no registra visitas: es normal hasta que lo publiques y alguien entre por el link."}
+                </p>
+              </div>
+            )}
 
             {form.status === "publicado" && (
               <div className="grid grid-cols-2 gap-4 rounded-md border border-dashed p-3">
@@ -863,10 +989,14 @@ function PieceCard({
   piece,
   onEdit,
   onDelete,
+  whatsapp,
+  whatsappDisplay,
 }: {
   piece: Piece;
   onEdit: (p: Piece) => void;
   onDelete: (p: Piece) => void;
+  whatsapp: string | null;
+  whatsappDisplay: string;
 }) {
   const meta = NETWORK_META[piece.network];
   const status = STATUS_META[piece.status];
@@ -874,48 +1004,114 @@ function PieceCard({
   const done = piece.status === "publicado";
   const dropped = piece.status === "descartado";
 
+  // El link solo tiene sentido si hay texto listo y un número configurado.
+  // Se muestra en ambas redes: el link abre WhatsApp con el mensaje
+  // precargado, que es lo que se usa tanto para la lista como para
+  // responder una consulta puntual.
+  const waLink = buildWhatsappLink(whatsapp, piece.copy);
+  const canSend = !!waLink && !!piece.copy.trim() && !dropped && piece.status !== "idea";
+
   return (
     <div
-      className={`rounded-md border border-l-4 p-2 text-xs space-y-1 ${
+      className={`rounded-md border border-l-4 p-2 text-xs space-y-1.5 ${
         meta.edge
       } ${dropped ? "opacity-50" : "bg-card"}`}
     >
-      <div className="flex items-start justify-between gap-1">
-        <span
-          className={`font-medium leading-tight ${done ? "line-through" : ""}`}
-        >
-          {piece.title}
-        </span>
-        <Icon className="h-3 w-3 shrink-0 opacity-60" />
-      </div>
+      <div className="flex items-start gap-2">
+        <ProductThumb piece={piece} />
 
-      <div className="flex items-center gap-1 flex-wrap">
-        <Badge variant={status.variant} className="text-[10px]">
-          {status.label}
-        </Badge>
-        {piece.results?.reach > 0 && (
-          <span className="text-[10px] text-muted-foreground">
-            {piece.results.reach} alcance
-          </span>
-        )}
-      </div>
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex items-start justify-between gap-1">
+            <span
+              className={`font-medium leading-tight ${done ? "line-through" : ""}`}
+            >
+              {piece.title}
+            </span>
+            <Icon className="h-3 w-3 shrink-0 opacity-60" />
+          </div>
 
-      <div className="flex gap-1 pt-0.5">
-        <button
-          onClick={() => onEdit(piece)}
-          className="text-muted-foreground hover:text-foreground"
-          title="Editar"
-        >
-          <Pencil className="h-3 w-3" />
-        </button>
-        <button
-          onClick={() => onDelete(piece)}
-          className="text-muted-foreground hover:text-destructive"
-          title="Eliminar"
-        >
-          <Trash2 className="h-3 w-3" />
-        </button>
+          <div className="flex items-center gap-1 flex-wrap">
+            <Badge variant={status.variant} className="text-[10px]">
+              {status.label}
+            </Badge>
+            {piece.results?.reach > 0 && (
+              <span className="text-[10px] text-muted-foreground">
+                {piece.results.reach} alcance
+              </span>
+            )}
+          </div>
+
+          {/* Lo que trajo la pieza de verdad: visitas, leads y clientes que
+              entraron por el link de esta campaña. */}
+          {piece.metrics &&
+            (piece.metrics.vistas > 0 || piece.metrics.leads > 0) && (
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                <span title="Visitas a productos con el link de esta pieza">
+                  {piece.metrics.vistas} visitas
+                </span>
+                <span>{piece.metrics.leads} leads</span>
+                {piece.metrics.clientes > 0 && (
+                  <span className="text-green-700 font-medium">
+                    {piece.metrics.clientes} clientes
+                  </span>
+                )}
+              </div>
+            )}
+
+          <div className="flex items-center gap-2 pt-0.5">
+            {canSend && (
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title={`Abrir WhatsApp con el mensaje listo (${whatsappDisplay})`}
+                className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-green-600 text-white hover:bg-green-700"
+              >
+                <Send className="h-2.5 w-2.5" />
+                WhatsApp
+              </a>
+            )}
+            <button
+              onClick={() => onEdit(piece)}
+              className="text-muted-foreground hover:text-foreground"
+              title="Editar"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+            <button
+              onClick={() => onDelete(piece)}
+              className="text-muted-foreground hover:text-destructive"
+              title="Eliminar"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+// Miniatura del producto vinculado. Usa <img> y no next/image a propósito:
+// las imágenes vienen de hosts que el usuario carga (Cloudinary y otros) y
+// next.config.ts solo tiene dos dominios permitidos; con next/image
+// anything fuera de esa lista no renderiza.
+function ProductThumb({ piece }: { piece: Piece }) {
+  const image = piece.product?.image;
+  if (!image) return null;
+
+  return (
+    <div className="shrink-0 w-9 h-9 rounded border overflow-hidden bg-muted relative">
+      <img
+        src={image}
+        alt={piece.product?.name || ""}
+        className="w-full h-full object-cover"
+        loading="lazy"
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = "none";
+        }}
+      />
     </div>
   );
 }

@@ -230,7 +230,7 @@ export default function CampaignDetailPage() {
         </CardHeader>
         <CardContent>
           <code className="text-xs bg-muted p-3 rounded block break-all">
-            {`?utm_source=${data.channel}&utm_medium=${data.utmMedium || "social"}&utm_campaign=${encodeURIComponent(data.name)}`}
+            {`?utm_source=${data.channel}&utm_medium=${data.utmMedium || "organic"}&utm_campaign=${encodeURIComponent(data.name)}`}
           </code>
           <p className="text-xs text-muted-foreground mt-3">
             La atribución es de primer contacto: si el visitante ya había

@@ -32,6 +32,10 @@ export interface IContentPiece extends Document {
   publishedAt: Date | null;
   product?: mongoose.Types.ObjectId | string;
   promotion?: mongoose.Types.ObjectId | string;
+  // Cada pieza puede medir a través de una Campaign. Es el puente hacia
+  // Lead/ProductView: el lead que entra por el link de esta pieza queda
+  // atado a esta campaña.
+  campaign?: mongoose.Types.ObjectId | string;
   // Métricas de la plataforma, cargadas a mano: no hay API de Instagram ni
   // de Facebook conectada, y no las vamos a conectar.
   results: {
@@ -92,6 +96,10 @@ const ContentPieceSchema: Schema<IContentPiece> = new Schema(
     promotion: {
       type: Schema.Types.ObjectId,
       ref: "Promotion",
+    },
+    campaign: {
+      type: Schema.Types.ObjectId,
+      ref: "Campaign",
     },
     results: {
       reach: { type: Number, default: 0, min: 0 },
