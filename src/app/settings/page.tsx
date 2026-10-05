@@ -54,6 +54,15 @@ export default function SettingsPage() {
     faviconUrl: "",
     customCss: "",
   });
+  const [heroData, setHeroData] = useState({
+    title: "",
+    subtitle: "",
+    ctaText: "",
+    tagline: "",
+  });
+  const [bannerUrls, setBannerUrls] = useState<string[]>([]);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [savingPage, setSavingPage] = useState(false);
   const { toast } = useToast();
   const { user } = useUser();
 
@@ -565,14 +574,139 @@ export default function SettingsPage() {
         <TabsContent value="page" className="space-y-6">
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-bold">
-                Personalización de la Tienda
-              </h2>
+              <h2 className="text-2xl font-bold">Personalización de la Tienda</h2>
               <p className="text-gray-600">
-                Personaliza la apariencia de tu tienda pública con colores,
-                logos y estilos personalizados
+                Editá los textos del hero, los banners y los colores de tu tienda pública
               </p>
             </div>
+
+            {/* Hero Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Monitor className="h-5 w-5" />
+                  Textos del Hero / Portada
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="heroTitle">Título principal</Label>
+                    <Input
+                      id="heroTitle"
+                      value={heroData.title}
+                      onChange={(e) => setHeroData({ ...heroData, title: e.target.value })}
+                      placeholder="Ej: Bienvenida a nuestra tienda"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="heroTagline">Tagline (frase corta)</Label>
+                    <Input
+                      id="heroTagline"
+                      value={heroData.tagline}
+                      onChange={(e) => setHeroData({ ...heroData, tagline: e.target.value })}
+                      placeholder="Ej: Belleza que inspira"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="heroSubtitle">Subtítulo / descripción</Label>
+                  <Textarea
+                    id="heroSubtitle"
+                    rows={3}
+                    value={heroData.subtitle}
+                    onChange={(e) => setHeroData({ ...heroData, subtitle: e.target.value })}
+                    placeholder="Ej: Encontrá los mejores productos de maquillaje con envío a todo el país"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="heroCta">Texto del botón CTA</Label>
+                  <Input
+                    id="heroCta"
+                    value={heroData.ctaText}
+                    onChange={(e) => setHeroData({ ...heroData, ctaText: e.target.value })}
+                    placeholder="Ej: Ver productos"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Banners */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Palette className="h-5 w-5" />
+                  Imágenes del Banner / Hero
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-gray-500">
+                  Subí hasta 5 imágenes. Se usan como slider o imagen principal en tu tienda pública.
+                </p>
+                {bannerUrls.length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {bannerUrls.map((url, idx) => (
+                      <div key={idx} className="relative group rounded-lg overflow-hidden border">
+                        <img src={url} alt={`Banner ${idx + 1}`} className="w-full h-28 object-cover" />
+                        <button
+                          onClick={() => setBannerUrls(bannerUrls.filter((_, i) => i !== idx))}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {bannerUrls.length < 5 && (
+                  <label
+                    className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                      uploadingBanner ? "border-blue-300 bg-blue-50" : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingBanner}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingBanner(true);
+                        try {
+                          const fd = new FormData();
+                          fd.append("file", file);
+                          const res = await fetch("/api/upload-image", { method: "POST", body: fd });
+                          const data = await res.json();
+                          if (data.success) {
+                            setBannerUrls((prev) => [...prev, data.url]);
+                          } else {
+                            toast({ title: "Error al subir imagen", description: data.error, variant: "destructive" });
+                          }
+                        } catch {
+                          toast({ title: "Error de red", description: "No se pudo subir la imagen", variant: "destructive" });
+                        } finally {
+                          setUploadingBanner(false);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                    {uploadingBanner ? (
+                      <div className="flex items-center gap-2 text-blue-500">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span className="text-sm">Subiendo imagen...</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 text-gray-400">
+                        <Package className="h-8 w-8" />
+                        <span className="text-sm font-medium">Hacé clic para subir una imagen</span>
+                        <span className="text-xs">PNG, JPG, WEBP · Máx. 5 MB</span>
+                      </div>
+                    )}
+                  </label>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Paleta de Colores */}
             <Card>
@@ -584,172 +718,62 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Color Primario */}
                   <div className="space-y-2">
                     <Label htmlFor="primaryColor">Color Primario</Label>
                     <div className="flex items-center gap-3">
-                      <Input
-                        id="primaryColor"
-                        type="color"
-                        value={themeData.primaryColor}
-                        onChange={(e) =>
-                          setThemeData({
-                            ...themeData,
-                            primaryColor: e.target.value,
-                          })
-                        }
-                        className="w-16 h-10 p-1 border rounded"
-                      />
-                      <Input
-                        value={themeData.primaryColor}
-                        onChange={(e) =>
-                          setThemeData({
-                            ...themeData,
-                            primaryColor: e.target.value,
-                          })
-                        }
-                        placeholder="#3B82F6"
-                        className="flex-1"
-                      />
+                      <Input id="primaryColor" type="color" value={themeData.primaryColor}
+                        onChange={(e) => setThemeData({ ...themeData, primaryColor: e.target.value })}
+                        className="w-16 h-10 p-1 border rounded" />
+                      <Input value={themeData.primaryColor}
+                        onChange={(e) => setThemeData({ ...themeData, primaryColor: e.target.value })}
+                        placeholder="#3B82F6" className="flex-1" />
                     </div>
-                    <p className="text-sm text-gray-500">
-                      Usado en botones principales, enlaces y elementos
-                      destacados
-                    </p>
+                    <p className="text-sm text-gray-500">Usado en botones principales y enlaces</p>
                   </div>
-
-                  {/* Color Secundario */}
                   <div className="space-y-2">
                     <Label htmlFor="secondaryColor">Color Secundario</Label>
                     <div className="flex items-center gap-3">
-                      <Input
-                        id="secondaryColor"
-                        type="color"
-                        value={themeData.secondaryColor}
-                        onChange={(e) =>
-                          setThemeData({
-                            ...themeData,
-                            secondaryColor: e.target.value,
-                          })
-                        }
-                        className="w-16 h-10 p-1 border rounded"
-                      />
-                      <Input
-                        value={themeData.secondaryColor}
-                        onChange={(e) =>
-                          setThemeData({
-                            ...themeData,
-                            secondaryColor: e.target.value,
-                          })
-                        }
-                        placeholder="#10B981"
-                        className="flex-1"
-                      />
+                      <Input id="secondaryColor" type="color" value={themeData.secondaryColor}
+                        onChange={(e) => setThemeData({ ...themeData, secondaryColor: e.target.value })}
+                        className="w-16 h-10 p-1 border rounded" />
+                      <Input value={themeData.secondaryColor}
+                        onChange={(e) => setThemeData({ ...themeData, secondaryColor: e.target.value })}
+                        placeholder="#10B981" className="flex-1" />
                     </div>
-                    <p className="text-sm text-gray-500">
-                      Usado en elementos de éxito, confirmaciones y acentos
-                    </p>
+                    <p className="text-sm text-gray-500">Usado en confirmaciones y acentos</p>
                   </div>
-
-                  {/* Color de Acento */}
                   <div className="space-y-2">
                     <Label htmlFor="accentColor">Color de Acento</Label>
                     <div className="flex items-center gap-3">
-                      <Input
-                        id="accentColor"
-                        type="color"
-                        value={themeData.accentColor}
-                        onChange={(e) =>
-                          setThemeData({
-                            ...themeData,
-                            accentColor: e.target.value,
-                          })
-                        }
-                        className="w-16 h-10 p-1 border rounded"
-                      />
-                      <Input
-                        value={themeData.accentColor}
-                        onChange={(e) =>
-                          setThemeData({
-                            ...themeData,
-                            accentColor: e.target.value,
-                          })
-                        }
-                        placeholder="#F59E0B"
-                        className="flex-1"
-                      />
+                      <Input id="accentColor" type="color" value={themeData.accentColor}
+                        onChange={(e) => setThemeData({ ...themeData, accentColor: e.target.value })}
+                        className="w-16 h-10 p-1 border rounded" />
+                      <Input value={themeData.accentColor}
+                        onChange={(e) => setThemeData({ ...themeData, accentColor: e.target.value })}
+                        placeholder="#F59E0B" className="flex-1" />
                     </div>
-                    <p className="text-sm text-gray-500">
-                      Usado en alertas, advertencias y elementos especiales
-                    </p>
+                    <p className="text-sm text-gray-500">Alertas y elementos especiales</p>
                   </div>
-
-                  {/* Color de Fondo */}
                   <div className="space-y-2">
                     <Label htmlFor="backgroundColor">Color de Fondo</Label>
                     <div className="flex items-center gap-3">
-                      <Input
-                        id="backgroundColor"
-                        type="color"
-                        value={themeData.backgroundColor}
-                        onChange={(e) =>
-                          setThemeData({
-                            ...themeData,
-                            backgroundColor: e.target.value,
-                          })
-                        }
-                        className="w-16 h-10 p-1 border rounded"
-                      />
-                      <Input
-                        value={themeData.backgroundColor}
-                        onChange={(e) =>
-                          setThemeData({
-                            ...themeData,
-                            backgroundColor: e.target.value,
-                          })
-                        }
-                        placeholder="#FFFFFF"
-                        className="flex-1"
-                      />
+                      <Input id="backgroundColor" type="color" value={themeData.backgroundColor}
+                        onChange={(e) => setThemeData({ ...themeData, backgroundColor: e.target.value })}
+                        className="w-16 h-10 p-1 border rounded" />
+                      <Input value={themeData.backgroundColor}
+                        onChange={(e) => setThemeData({ ...themeData, backgroundColor: e.target.value })}
+                        placeholder="#FFFFFF" className="flex-1" />
                     </div>
-                    <p className="text-sm text-gray-500">
-                      Color de fondo principal de la página
-                    </p>
+                    <p className="text-sm text-gray-500">Color de fondo principal</p>
                   </div>
                 </div>
-
-                {/* Vista Previa de Colores */}
                 <div className="mt-6 p-4 border rounded-lg bg-gray-50">
                   <h4 className="font-medium mb-3">Vista Previa</h4>
                   <div className="flex flex-wrap gap-3">
-                    <div
-                      className="px-4 py-2 rounded text-white font-medium"
-                      style={{ backgroundColor: themeData.primaryColor }}
-                    >
-                      Botón Primario
-                    </div>
-                    <div
-                      className="px-4 py-2 rounded text-white font-medium"
-                      style={{ backgroundColor: themeData.secondaryColor }}
-                    >
-                      Botón Secundario
-                    </div>
-                    <div
-                      className="px-4 py-2 rounded text-white font-medium"
-                      style={{ backgroundColor: themeData.accentColor }}
-                    >
-                      Acento
-                    </div>
-                    <div
-                      className="px-4 py-2 rounded border-2"
-                      style={{
-                        backgroundColor: themeData.backgroundColor,
-                        borderColor: themeData.primaryColor,
-                        color: themeData.textColor,
-                      }}
-                    >
-                      Fondo
-                    </div>
+                    <div className="px-4 py-2 rounded text-white font-medium" style={{ backgroundColor: themeData.primaryColor }}>Primario</div>
+                    <div className="px-4 py-2 rounded text-white font-medium" style={{ backgroundColor: themeData.secondaryColor }}>Secundario</div>
+                    <div className="px-4 py-2 rounded text-white font-medium" style={{ backgroundColor: themeData.accentColor }}>Acento</div>
+                    <div className="px-4 py-2 rounded border-2" style={{ backgroundColor: themeData.backgroundColor, borderColor: themeData.primaryColor, color: themeData.textColor }}>Fondo</div>
                   </div>
                 </div>
               </CardContent>
@@ -765,62 +789,26 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Logo Principal */}
                   <div className="space-y-2">
                     <Label htmlFor="logoUrl">URL del Logo Principal</Label>
-                    <Input
-                      id="logoUrl"
-                      value={themeData.logoUrl}
-                      onChange={(e) =>
-                        setThemeData({ ...themeData, logoUrl: e.target.value })
-                      }
-                      placeholder="https://ejemplo.com/logo.png"
-                    />
-                    <p className="text-sm text-gray-500">
-                      URL de la imagen del logo para el header de tu tienda
-                    </p>
+                    <Input id="logoUrl" value={themeData.logoUrl}
+                      onChange={(e) => setThemeData({ ...themeData, logoUrl: e.target.value })}
+                      placeholder="https://ejemplo.com/logo.png" />
+                    <p className="text-sm text-gray-500">Logo para el header de tu tienda</p>
                     {themeData.logoUrl && (
-                      <div className="mt-2">
-                        <img
-                          src={themeData.logoUrl}
-                          alt="Vista previa del logo"
-                          className="h-16 object-contain border rounded"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                          }}
-                        />
-                      </div>
+                      <img src={themeData.logoUrl} alt="Logo" className="h-16 object-contain border rounded mt-2"
+                        onError={(e) => { e.currentTarget.style.display = "none"; }} />
                     )}
                   </div>
-
-                  {/* Favicon */}
                   <div className="space-y-2">
                     <Label htmlFor="faviconUrl">URL del Favicon</Label>
-                    <Input
-                      id="faviconUrl"
-                      value={themeData.faviconUrl}
-                      onChange={(e) =>
-                        setThemeData({
-                          ...themeData,
-                          faviconUrl: e.target.value,
-                        })
-                      }
-                      placeholder="https://ejemplo.com/favicon.ico"
-                    />
-                    <p className="text-sm text-gray-500">
-                      Icono que aparece en la pestaña del navegador
-                    </p>
+                    <Input id="faviconUrl" value={themeData.faviconUrl}
+                      onChange={(e) => setThemeData({ ...themeData, faviconUrl: e.target.value })}
+                      placeholder="https://ejemplo.com/favicon.ico" />
+                    <p className="text-sm text-gray-500">Icono de la pestaña del navegador</p>
                     {themeData.faviconUrl && (
-                      <div className="mt-2">
-                        <img
-                          src={themeData.faviconUrl}
-                          alt="Vista previa del favicon"
-                          className="h-8 w-8 object-contain border rounded"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                          }}
-                        />
-                      </div>
+                      <img src={themeData.faviconUrl} alt="Favicon" className="h-8 w-8 object-contain border rounded mt-2"
+                        onError={(e) => { e.currentTarget.style.display = "none"; }} />
                     )}
                   </div>
                 </div>
@@ -838,63 +826,58 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="customCss">Código CSS Personalizado</Label>
-                  <Textarea
-                    id="customCss"
-                    value={themeData.customCss}
-                    onChange={(e) =>
-                      setThemeData({ ...themeData, customCss: e.target.value })
-                    }
-                    placeholder="/* Tu CSS personalizado aquí */
-.custom-button {
-  border-radius: 8px;
-  font-weight: 600;
-}
-
-.product-card {
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}"
-                    rows={8}
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-sm text-gray-500">
-                    Agrega estilos CSS personalizados para personalizar aún más
-                    tu tienda
-                  </p>
+                  <Textarea id="customCss" value={themeData.customCss}
+                    onChange={(e) => setThemeData({ ...themeData, customCss: e.target.value })}
+                    placeholder={`/* Tu CSS personalizado aquí */\n.custom-button { border-radius: 8px; }`}
+                    rows={8} className="font-mono text-sm" />
                 </div>
               </CardContent>
             </Card>
 
-            {/* Botones de Acción */}
+            {/* Botones */}
             <div className="flex justify-end gap-3">
               <Button
                 variant="outline"
                 onClick={() => {
-                  setThemeData({
-                    primaryColor: "#3B82F6",
-                    secondaryColor: "#10B981",
-                    accentColor: "#F59E0B",
-                    backgroundColor: "#FFFFFF",
-                    textColor: "#1F2937",
-                    cardBackground: "#F9FAFB",
-                    borderColor: "#E5E7EB",
-                    logoUrl: "",
-                    faviconUrl: "",
-                    customCss: "",
-                  });
+                  setThemeData({ primaryColor: "#3B82F6", secondaryColor: "#10B981", accentColor: "#F59E0B",
+                    backgroundColor: "#FFFFFF", textColor: "#1F2937", cardBackground: "#F9FAFB",
+                    borderColor: "#E5E7EB", logoUrl: "", faviconUrl: "", customCss: "" });
+                  setHeroData({ title: "", subtitle: "", ctaText: "", tagline: "" });
+                  setBannerUrls([]);
                 }}
               >
                 Restaurar Valores por Defecto
               </Button>
               <Button
-                onClick={() => {
-                  toast({
-                    title: "Tema Guardado",
-                    description:
-                      "La configuración de tu tienda ha sido guardada exitosamente",
-                  });
+                disabled={savingPage}
+                onClick={async () => {
+                  if (!stores || stores.length === 0) {
+                    toast({ title: "Error", description: "No hay tienda asociada", variant: "destructive" });
+                    return;
+                  }
+                  setSavingPage(true);
+                  try {
+                    const token = localStorage.getItem("token");
+                    const storeId = stores[0]._id;
+                    const res = await fetch(`/api/stores?id=${storeId}`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ theme: { ...themeData, bannerUrls }, hero: heroData }),
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                      toast({ title: "¡Guardado!", description: "La apariencia de tu tienda fue actualizada." });
+                    } else {
+                      throw new Error(result.error);
+                    }
+                  } catch (err: any) {
+                    toast({ title: "Error", description: err.message || "No se pudo guardar", variant: "destructive" });
+                  } finally {
+                    setSavingPage(false);
+                  }
                 }}
               >
-                Guardar Configuración
+                {savingPage ? (<><Loader2 className="h-4 w-4 animate-spin mr-2" />Guardando...</>) : "Guardar Configuración"}
               </Button>
             </div>
           </div>

@@ -28,6 +28,14 @@ export interface IStore extends Document {
     customCss?: string;
   };
 
+  // Contenido del Hero / Landing
+  hero?: {
+    title?: string;
+    subtitle?: string;
+    ctaText?: string;
+    tagline?: string;
+  };
+
   // Configuración de contacto
   contact: {
     email?: string;
@@ -175,6 +183,14 @@ const StoreSchema: Schema<IStore> = new Schema(
       customCss: {
         type: String,
       },
+    },
+
+    // Contenido del Hero
+    hero: {
+      title: { type: String, default: "" },
+      subtitle: { type: String, default: "" },
+      ctaText: { type: String, default: "" },
+      tagline: { type: String, default: "" },
     },
 
     // Configuración de contacto

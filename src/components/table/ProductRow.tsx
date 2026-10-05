@@ -14,6 +14,7 @@ import {
   Percent,
   Package,
   Loader2,
+  MessageSquare,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -29,6 +30,7 @@ import { ProductEditModal } from "@/components/ProductEditModal";
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { BarcodeModal } from "@/components/BarcodeModal";
 import { DiscountModal } from "@/components/DiscountModal";
+import { ProductCommentsModal } from "@/components/ProductCommentsModal";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -84,6 +86,7 @@ const ProductRow: React.FC<ProductRowProps> = ({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
+  const [isCommentsModalOpen, setIsCommentsModalOpen] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
@@ -613,6 +616,10 @@ const ProductRow: React.FC<ProductRowProps> = ({
                 <Percent className="h-4 w-4 mr-2" />
                 {product.hasDiscount ? "Editar descuento" : "Agregar descuento"}
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setIsCommentsModalOpen(true); setIsDropdownOpen(false); }}>
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Ver Comentarios
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handleDeleteClick}
@@ -673,6 +680,13 @@ const ProductRow: React.FC<ProductRowProps> = ({
         isOpen={isBarcodeModalOpen}
         onClose={() => setIsBarcodeModalOpen(false)}
         onProductUpdate={onProductUpdate}
+      />
+
+      <ProductCommentsModal
+        productId={product._id}
+        productName={product.name}
+        isOpen={isCommentsModalOpen}
+        onClose={() => setIsCommentsModalOpen(false)}
       />
     </TableRow>
   );

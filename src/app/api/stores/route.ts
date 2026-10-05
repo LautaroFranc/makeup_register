@@ -258,7 +258,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, storeName, description, customUrl, isActive, isPublic, theme, contact, settings, paymentMethods } =
+    const { name, storeName, description, customUrl, isActive, isPublic, theme, contact, settings, paymentMethods, hero } =
       body;
 
     // Verificar que la tienda pertenece al usuario
@@ -298,6 +298,7 @@ export async function PUT(req: NextRequest) {
     if (contact) updateData.contact = { ...store.contact, ...contact };
     if (settings) updateData.settings = { ...store.settings, ...settings };
     if (paymentMethods) updateData.paymentMethods = { ...store.paymentMethods, ...paymentMethods };
+    if (hero) updateData.hero = { ...(store.hero || {}), ...hero };
 
     const updatedStore = await Store.findByIdAndUpdate(storeId, updateData, {
       new: true,
