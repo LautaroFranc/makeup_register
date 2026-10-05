@@ -14,7 +14,8 @@ import { Search, RotateCcw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StorePreviewButton } from "@/components/StorePreviewButton";
-import { Percent, Sparkles } from "lucide-react";
+import { Percent, Sparkles, FileDown } from "lucide-react";
+import { exportProductsToExcel } from "@/lib/exportProducts";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -145,6 +146,24 @@ export default function ProductDashboard() {
   const [isWholesaleDialogOpen, setIsWholesaleDialogOpen] = useState(false);
   const [wholesaleDiscountPercent, setWholesaleDiscountPercent] = useState<number>(10);
   const [submittingWholesale, setSubmittingWholesale] = useState(false);
+
+  // Estado para exportación a Excel
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      await exportProductsToExcel(filters);
+    } catch (err) {
+      toast({
+        title: "Error al exportar",
+        description: "No se pudo generar el archivo Excel.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleGenerateWholesalePrices = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -581,6 +600,16 @@ export default function ProductDashboard() {
                   </form>
                 </DialogContent>
               </Dialog>
+
+              <Button
+                variant="outline"
+                onClick={handleExportExcel}
+                disabled={isExporting}
+                className="flex items-center gap-2 border-green-300 text-green-700 hover:bg-green-50"
+              >
+                <FileDown className={`h-4 w-4 ${isExporting ? "animate-bounce" : ""}`} />
+                {isExporting ? "Exportando..." : "Exportar Excel"}
+              </Button>
 
               <Button
                 variant="outline"
