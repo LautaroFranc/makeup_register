@@ -337,6 +337,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               <DropdownMenu
                 open={isDropdownOpen}
                 onOpenChange={setIsDropdownOpen}
+                modal={false}
               >
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" className="h-8 w-8">

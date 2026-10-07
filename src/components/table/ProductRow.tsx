@@ -594,7 +594,7 @@ const ProductRow: React.FC<ProductRowProps> = ({
           </Button>
 
           {/* Menú de acciones secundarias */}
-          <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+          <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen} modal={false}>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="icon" className="h-8 w-8">
                 <MoreVertical className="h-4 w-4" />
