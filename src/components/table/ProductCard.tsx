@@ -273,8 +273,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
     <>
       <Card className="w-full">
         <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
               {/* Imagen del producto */}
               {hasImages ? (
                 <div className="relative">
@@ -302,8 +302,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   onClick={() => setIsImageModalOpen(true)}
                 />
               )}
-              <div>
-                <CardTitle className="text-sm sm:text-base md:text-lg line-clamp-2">
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-sm sm:text-base md:text-lg line-clamp-2" title={product.name}>
                   {product.name}
                 </CardTitle>
                 <p className="text-sm text-gray-500">{product.code}</p>
@@ -320,7 +320,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {/* Switch de visibilidad */}
               <div className="flex items-center gap-1">
                 <Switch
