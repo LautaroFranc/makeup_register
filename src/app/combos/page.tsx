@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { exportCombosToExcel } from "@/lib/exportCombos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,8 @@ import {
   Loader2,
   Eye,
   EyeOff,
+  Download,
+  Upload,
 } from "lucide-react";
 
 interface ComboItem {
@@ -94,6 +97,8 @@ export default function CombosPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [productSearch, setProductSearch] = useState("");
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
@@ -253,6 +258,50 @@ export default function CombosPage() {
     } catch {}
   };
 
+  const handleExport = async () => {
+    try {
+      await exportCombosToExcel("combos");
+      toast({ title: "Excel exportado exitosamente" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("updateExisting", "true");
+
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch("/api/combos/import", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast({
+          title: "Importación exitosa",
+          description: data.message,
+        });
+        fetchCombos();
+      } else {
+        toast({ title: "Error en importación", description: data.error || data.details, variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error de conexión", description: err.message, variant: "destructive" });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const filteredProducts = products.filter(
     (p) =>
       p.name.toLowerCase().includes(productSearch.toLowerCase()) &&
@@ -268,9 +317,26 @@ export default function CombosPage() {
             Agrupá productos en paquetes con precio especial
           </p>
         </div>
-        <Button onClick={openCreate} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" /> Crear Combo
-        </Button>
+        <div className="flex items-center gap-2">
+          <input
+            type="file"
+            accept=".xlsx, .xls"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleImport}
+          />
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            {importing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+            Importar
+          </Button>
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="h-4 w-4 mr-2" />
+            Exportar / Plantilla
+          </Button>
+          <Button onClick={openCreate} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" /> Crear Combo
+          </Button>
+        </div>
       </div>
 
       {loading ? (
