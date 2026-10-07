@@ -137,6 +137,7 @@ export default function FutureProductsPage() {
   const [categories, setCategories] = useState<{name: string}[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<"all" | Status>("all");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
   const [form, setForm] = useState({ ...emptyForm });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -176,8 +177,11 @@ export default function FutureProductsPage() {
   const margin = form.suggestedSellPrice && totalCost > 0
     ? Math.round(((num(form.suggestedSellPrice) - totalCost) / num(form.suggestedSellPrice)) * 100)
     : null;
-
-  const filtered = filterStatus === "all" ? items : items.filter(i => i.status === filterStatus);
+  const filtered = items.filter(i => {
+    if (filterStatus !== "all" && i.status !== filterStatus) return false;
+    if (filterCategory !== "all" && (i.category || "Sin categoría") !== filterCategory) return false;
+    return true;
+  });
 
   // Conteo por estado para el filtro
   const counts = items.reduce<Record<string, number>>((acc, i) => { acc[i.status] = (acc[i.status] || 0) + 1; return acc; }, {});
@@ -409,6 +413,21 @@ export default function FutureProductsPage() {
               {STATUS_CONFIG[s].label} {counts[s] ? `(${counts[s]})` : ""}
             </button>
           ))}
+        </div>
+
+        {/* Filtro por categoría */}
+        <div className="flex gap-2 mt-2 overflow-x-auto pb-3 max-w-6xl mx-auto">
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger className="w-[200px] h-8 text-xs bg-white">
+              <SelectValue placeholder="Filtrar por categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las categorías</SelectItem>
+              {Array.from(new Set(items.map(i => i.category || "Sin categoría"))).sort().map(cat => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
