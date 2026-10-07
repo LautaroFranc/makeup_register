@@ -466,7 +466,21 @@ export default function FutureProductsPage() {
                     {item.estimatedMargin !== undefined && (
                       <p className="text-xs text-purple-700 font-medium">Margen estimado: {item.estimatedMargin}%</p>
                     )}
-                    <div className="flex items-center justify-end pt-1">
+                    <div className="flex items-center justify-between pt-1">
+                      {item.productUrl ? (
+                        <a
+                          href={item.productUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Ver producto
+                        </a>
+                      ) : (
+                        <div />
+                      )}
                       <ChevronRight className="h-4 w-4 text-gray-400" />
                     </div>
                   </CardContent>
