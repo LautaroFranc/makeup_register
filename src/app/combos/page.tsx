@@ -365,7 +365,9 @@ export default function CombosPage() {
                       <div className="flex items-center gap-1 shrink-0">
                         <span>{formatToARS(item.unitSellPrice * item.quantity)}</span>
                         {item.currentStock !== undefined && item.currentStock < item.quantity && (
-                          <AlertTriangle className="h-3 w-3 text-amber-500" title={`Stock: ${item.currentStock}`} />
+                          <span title={`Stock: ${item.currentStock}`}>
+                            <AlertTriangle className="h-3 w-3 text-amber-500" />
+                          </span>
                         )}
                       </div>
                     </div>

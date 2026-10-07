@@ -108,6 +108,11 @@ const menuGroups = [
         icon: FolderTree,
       },
       {
+        title: "Combos y Kits",
+        url: "/combos",
+        icon: Package,
+      },
+      {
         title: "Promociones",
         icon: Tag,
         subItems: [
