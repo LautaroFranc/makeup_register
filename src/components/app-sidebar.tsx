@@ -22,6 +22,7 @@ import {
   BarChart3,
   Eye,
   Megaphone,
+  Telescope,
 } from "lucide-react";
 
 import {
@@ -111,6 +112,11 @@ const menuGroups = [
         title: "Combos y Kits",
         url: "/combos",
         icon: Package,
+      },
+      {
+        title: "Futuros Productos",
+        url: "/future-products",
+        icon: Telescope,
       },
       {
         title: "Promociones",
