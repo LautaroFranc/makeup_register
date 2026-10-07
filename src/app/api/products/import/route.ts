@@ -31,6 +31,15 @@ const COLUMN_MAP: Record<string, string> = {
   stock: "stock",
   publicado: "published",
   published: "published",
+  // Columnas de descuento (coinciden con el export)
+  "tiene descuento": "hasDiscount",
+  hasdiscount: "hasDiscount",
+  "% descuento": "discountPercentage",
+  "porcentaje descuento": "discountPercentage",
+  discountpercentage: "discountPercentage",
+  "precio c/descuento": "discountedPrice",
+  "precio con descuento": "discountedPrice",
+  discountedprice: "discountedPrice",
 };
 
 function normalizeKey(key: string): string {
@@ -171,6 +180,33 @@ export async function POST(req: NextRequest) {
         publishedRaw === "1" ||
         publishedRaw === "yes";
 
+      // Procesar campos de descuento
+      const hasDiscountRaw = String(row.hasDiscount || "").toLowerCase().trim();
+      const hasDiscount =
+        hasDiscountRaw === "si" ||
+        hasDiscountRaw === "sí" ||
+        hasDiscountRaw === "true" ||
+        hasDiscountRaw === "1" ||
+        hasDiscountRaw === "yes";
+
+      const discountPercentage = hasDiscount
+        ? parseFloat(String(row.discountPercentage || "0").replace(",", ".")) || 0
+        : 0;
+
+      // Si viene discountedPrice del Excel la usamos; si no, la recalculamos
+      let discountedPrice: string;
+      if (hasDiscount && discountPercentage > 0) {
+        if (row.discountedPrice && String(row.discountedPrice).trim() !== "") {
+          discountedPrice = parseFloat(
+            String(row.discountedPrice).replace(",", ".")
+          ).toFixed(2);
+        } else {
+          discountedPrice = (sellPrice * (1 - discountPercentage / 100)).toFixed(2);
+        }
+      } else {
+        discountedPrice = sellPrice.toFixed(2);
+      }
+
       const productData = {
         name,
         description: String(row.description || "").trim(),
@@ -182,6 +218,9 @@ export async function POST(req: NextRequest) {
         published,
         user: userId,
         store: store._id.toString(),
+        hasDiscount,
+        discountPercentage,
+        discountedPrice,
       };
 
       const existing = existingMap.get(name.toLowerCase());
@@ -265,6 +304,9 @@ export async function POST(req: NextRequest) {
               wholesalePrice: data.wholesalePrice,
               stock: data.stock,
               published: data.published,
+              hasDiscount: data.hasDiscount,
+              discountPercentage: data.discountPercentage,
+              discountedPrice: data.discountedPrice,
             },
           },
           { runValidators: true }
