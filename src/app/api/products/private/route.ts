@@ -134,11 +134,39 @@ export async function GET(req: NextRequest) {
       return productObj;
     });
 
-    // Contar total de productos con filtros para calcular páginas
-    const totalProducts = await Product.countDocuments(query);
-    const totalPages = Math.ceil(totalProducts / limit);
+    // Calcular resumen de la selección filtrada (totales sin paginación)
+    const allFilteredProducts = await Product.find(query);
+    let filteredTotalStock = 0;
+    let filteredValorSinDescuento = 0;
+    let filteredValorConDescuento = 0;
 
-    // Obtener categorías disponibles para este usuario (para filtros)
+    const now = new Date();
+    const isGlobalDiscountActive =
+      globalDiscount &&
+      (!globalDiscount.endDate || new Date(globalDiscount.endDate) >= now);
+
+    allFilteredProducts.forEach((p) => {
+      const pObj = p.toObject();
+      const stock = pObj.stock || 0;
+      const sellPrice = parseFloat(pObj.sellPrice || "0") || 0;
+
+      filteredTotalStock += stock;
+      filteredValorSinDescuento += sellPrice * stock;
+
+      let discountedPrice = sellPrice;
+      if (pObj.hasDiscount && pObj.discountPercentage > 0) {
+        discountedPrice = sellPrice * (1 - pObj.discountPercentage / 100);
+      } else if (isGlobalDiscountActive && globalDiscount) {
+        discountedPrice = sellPrice * (1 - globalDiscount.discountPercentage / 100);
+      }
+
+      filteredValorConDescuento += discountedPrice * stock;
+    });
+
+    const filteredDescuentoTotal = filteredValorSinDescuento - filteredValorConDescuento;
+
+    const totalProducts = allFilteredProducts.length;
+    const totalPages = Math.ceil(totalProducts / limit);
     const availableCategories = await Product.distinct("category", {
       user: _id,
     });
@@ -153,6 +181,13 @@ export async function GET(req: NextRequest) {
         hasNextPage: page < totalPages,
         hasPrevPage: page > 1,
         limit,
+      },
+      filteredSummary: {
+        totalProducts,
+        totalStock: filteredTotalStock,
+        valorSinDescuento: Number(filteredValorSinDescuento.toFixed(2)),
+        valorConDescuento: Number(filteredValorConDescuento.toFixed(2)),
+        descuentoTotal: Number(filteredDescuentoTotal.toFixed(2)),
       },
       filters: {
         availableCategories,

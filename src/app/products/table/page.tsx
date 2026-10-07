@@ -100,11 +100,21 @@ interface FilterState {
   maxPrice?: string;
 }
 
+interface FilteredSummary {
+  totalProducts: number;
+  totalStock: number;
+  valorSinDescuento: number;
+  valorConDescuento: number;
+  descuentoTotal: number;
+}
+
 export default function ProductDashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [dashboardSummary, setDashboardSummary] =
     useState<DashboardSummary | null>(null);
+  const [filteredSummary, setFilteredSummary] =
+    useState<FilteredSummary | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [paginationLoading, setPaginationLoading] = useState<boolean>(false);
   const [pagination, setPagination] = useState({
@@ -354,6 +364,10 @@ export default function ProductDashboard() {
         setPagination(data.pagination);
         setCurrentPage(page);
 
+        if (data.filteredSummary) {
+          setFilteredSummary(data.filteredSummary);
+        }
+
         // Actualizar categorías disponibles si vienen en la respuesta
         if (data.filters?.availableCategories) {
           setAvailableCategories(data.filters.availableCategories);
@@ -524,6 +538,55 @@ export default function ProductDashboard() {
                     <div className="text-2xl">⚠️</div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Resumen de Selección Filtrada */}
+          {filteredSummary && (
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-blue-900 uppercase tracking-wide flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-blue-600" />
+                  Resumen de Productos Filtrados
+                </h3>
+                <span className="text-xs bg-blue-100 text-blue-800 font-medium px-2.5 py-0.5 rounded-full">
+                  {filteredSummary.totalProducts} producto{filteredSummary.totalProducts !== 1 ? "s" : ""} ({filteredSummary.totalStock} unid. total)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-1 bg-blue-50/60 p-3 rounded-lg border border-blue-100">
+                  <p className="text-xs text-gray-600 font-medium">Productos Filtrados</p>
+                  <p className="text-xl font-bold text-blue-900">
+                    {filteredSummary.totalProducts} <span className="text-xs font-normal text-gray-500">({filteredSummary.totalStock} unid)</span>
+                  </p>
+                </div>
+
+                <div className="space-y-1 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                  <p className="text-xs text-gray-600 font-medium">Total Sin Descuento</p>
+                  <p className="text-xl font-bold text-gray-700">
+                    {formatToARS(filteredSummary.valorSinDescuento)}
+                  </p>
+                </div>
+
+                <div className="space-y-1 bg-green-50/60 p-3 rounded-lg border border-green-200">
+                  <p className="text-xs text-green-700 font-medium">Total Con Descuento</p>
+                  <p className="text-xl font-bold text-green-700">
+                    {formatToARS(filteredSummary.valorConDescuento)}
+                  </p>
+                </div>
+
+                <div className="space-y-1 bg-purple-50/60 p-3 rounded-lg border border-purple-200">
+                  <p className="text-xs text-purple-700 font-medium">Descuento Total / Ahorro</p>
+                  <p className="text-xl font-bold text-purple-700">
+                    {filteredSummary.descuentoTotal > 0 ? (
+                      <span>-{formatToARS(filteredSummary.descuentoTotal)}</span>
+                    ) : (
+                      <span className="text-gray-400">$0,00</span>
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
           )}
