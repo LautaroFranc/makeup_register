@@ -134,6 +134,7 @@ function num(v: string | number | undefined) {
 
 export default function FutureProductsPage() {
   const [items, setItems] = useState<FutureProduct[]>([]);
+  const [categories, setCategories] = useState<{name: string}[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<"all" | Status>("all");
   const [form, setForm] = useState({ ...emptyForm });
@@ -150,12 +151,17 @@ export default function FutureProductsPage() {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
-  const fetchItems = useCallback(async () => {
+  const fetchItemsAndCategories = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/future-products", { headers });
-      const data = await res.json();
-      if (data.success) setItems(data.items);
+      const [resItems, resCats] = await Promise.all([
+        fetch("/api/future-products", { headers }),
+        fetch("/api/categories/private?includeInactive=true", { headers })
+      ]);
+      const dataItems = await resItems.json();
+      const dataCats = await resCats.json();
+      if (dataItems.success) setItems(dataItems.items);
+      if (dataCats.categories) setCategories(dataCats.categories);
     } catch {
       toast({ title: "Error al cargar", variant: "destructive" });
     } finally {
@@ -163,7 +169,7 @@ export default function FutureProductsPage() {
     }
   }, []);
 
-  useEffect(() => { fetchItems(); }, []);
+  useEffect(() => { fetchItemsAndCategories(); }, []);
 
   // Costos calculados en tiempo real (formulario)
   const totalCost = num(form.productCost) + num(form.shippingCost) + num(form.otherCosts);
@@ -175,6 +181,15 @@ export default function FutureProductsPage() {
 
   // Conteo por estado para el filtro
   const counts = items.reduce<Record<string, number>>((acc, i) => { acc[i.status] = (acc[i.status] || 0) + 1; return acc; }, {});
+
+  // Group by category
+  const groupedByCategory = filtered.reduce((acc, item) => {
+    const cat = item.category || "Sin categoría";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(item);
+    return acc;
+  }, {} as Record<string, FutureProduct[]>);
+  const categoryNames = Object.keys(groupedByCategory).sort();
 
   // ─── Handlers ───────────────────────────────────────────────────────────────
 
@@ -204,7 +219,7 @@ export default function FutureProductsPage() {
       const data = await res.json();
       if (data.success) {
         toast({ title: "Importación exitosa", description: data.message });
-        fetchItems();
+        fetchItemsAndCategories();
       } else {
         toast({ title: "Error en importación", description: data.error, variant: "destructive" });
       }
@@ -269,7 +284,7 @@ export default function FutureProductsPage() {
       if (data.success) {
         toast({ title: editingId ? "Actualizado" : "Creado", description: data.item?.name });
         setIsFormOpen(false);
-        fetchItems();
+        fetchItemsAndCategories();
       } else {
         toast({ title: "Error", description: data.error, variant: "destructive" });
       }
@@ -286,7 +301,7 @@ export default function FutureProductsPage() {
       await fetch(`/api/future-products?id=${id}`, { method: "DELETE", headers });
       toast({ title: "Eliminado" });
       setDetailItem(null);
-      fetchItems();
+      fetchItemsAndCategories();
     } catch {
       toast({ title: "Error al eliminar", variant: "destructive" });
     }
@@ -297,7 +312,7 @@ export default function FutureProductsPage() {
       await fetch(`/api/future-products?id=${item._id}`, {
         method: "PUT", headers, body: JSON.stringify({ status }),
       });
-      fetchItems();
+      fetchItemsAndCategories();
       if (detailItem?._id === item._id) setDetailItem({ ...detailItem, status });
     } catch {}
   };
@@ -331,7 +346,7 @@ export default function FutureProductsPage() {
       if (data.success) {
         toast({ title: "¡Producto creado!", description: data.message });
         setConvertItem(null);
-        fetchItems();
+        fetchItemsAndCategories();
       } else {
         toast({ title: "Error", description: data.error, variant: "destructive" });
       }
@@ -415,78 +430,85 @@ export default function FutureProductsPage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filtered.map(item => {
-              const sc = STATUS_CONFIG[item.status];
-              const pc = PRIORITY_CONFIG[item.priority];
-              const isConverted = !!item.convertedProductId;
-              return (
-                <Card
-                  key={item._id}
-                  className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99]"
-                  onClick={() => setDetailItem(item)}
-                >
-                  <CardHeader className="pb-2 pt-4 px-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-sm font-semibold leading-tight line-clamp-2">{item.name}</CardTitle>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className={`w-2 h-2 rounded-full ${pc.dot}`} title={`Prioridad: ${pc.label}`} />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      <Badge variant="outline" className={`text-[11px] px-2 py-0 flex items-center gap-1 ${sc.color}`}>
-                        {sc.icon}{sc.label}
-                      </Badge>
-                      {isConverted && (
-                        <Badge variant="outline" className="text-[11px] px-2 py-0 text-green-700 border-green-300 bg-green-50">
-                          <CircleCheck className="h-3 w-3 mr-1" />Convertido
-                        </Badge>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="px-4 pb-4 space-y-2">
-                    {item.supplier && (
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                        <Store className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{item.supplier}</span>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 gap-2 bg-gray-50 rounded-lg p-2 mt-1">
-                      <div>
-                        <p className="text-[10px] text-gray-400">Costo total</p>
-                        <p className="text-sm font-bold text-gray-800">{formatARS(item.totalCost)}</p>
-                      </div>
-                      {item.suggestedSellPrice ? (
-                        <div>
-                          <p className="text-[10px] text-gray-400">Venta sugerida</p>
-                          <p className="text-sm font-bold text-green-700">{formatARS(item.suggestedSellPrice)}</p>
-                        </div>
-                      ) : null}
-                    </div>
-                    {item.estimatedMargin !== undefined && (
-                      <p className="text-xs text-purple-700 font-medium">Margen estimado: {item.estimatedMargin}%</p>
-                    )}
-                    <div className="flex items-center justify-between pt-1">
-                      {item.productUrl ? (
-                        <a
-                          href={item.productUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          Ver producto
-                        </a>
-                      ) : (
-                        <div />
-                      )}
-                      <ChevronRight className="h-4 w-4 text-gray-400" />
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+          <div className="space-y-8">
+            {categoryNames.map(cat => (
+              <div key={cat}>
+                <h2 className="text-xl font-bold text-gray-800 mb-4">{cat}</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {groupedByCategory[cat].map(item => {
+                    const sc = STATUS_CONFIG[item.status];
+                    const pc = PRIORITY_CONFIG[item.priority];
+                    const isConverted = !!item.convertedProductId;
+                    return (
+                      <Card
+                        key={item._id}
+                        className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99]"
+                        onClick={() => setDetailItem(item)}
+                      >
+                        <CardHeader className="pb-2 pt-4 px-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <CardTitle className="text-sm font-semibold leading-tight line-clamp-2">{item.name}</CardTitle>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className={`w-2 h-2 rounded-full ${pc.dot}`} title={`Prioridad: ${pc.label}`} />
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <Badge variant="outline" className={`text-[11px] px-2 py-0 flex items-center gap-1 ${sc.color}`}>
+                              {sc.icon}{sc.label}
+                            </Badge>
+                            {isConverted && (
+                              <Badge variant="outline" className="text-[11px] px-2 py-0 text-green-700 border-green-300 bg-green-50">
+                                <CircleCheck className="h-3 w-3 mr-1" />Convertido
+                              </Badge>
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent className="px-4 pb-4 space-y-2">
+                          {item.supplier && (
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                              <Store className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{item.supplier}</span>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 gap-2 bg-gray-50 rounded-lg p-2 mt-1">
+                            <div>
+                              <p className="text-[10px] text-gray-400">Costo total</p>
+                              <p className="text-sm font-bold text-gray-800">{formatARS(item.totalCost)}</p>
+                            </div>
+                            {item.suggestedSellPrice ? (
+                              <div>
+                                <p className="text-[10px] text-gray-400">Venta sugerida</p>
+                                <p className="text-sm font-bold text-green-700">{formatARS(item.suggestedSellPrice)}</p>
+                              </div>
+                            ) : null}
+                          </div>
+                          {item.estimatedMargin !== undefined && (
+                            <p className="text-xs text-purple-700 font-medium">Margen estimado: {item.estimatedMargin}%</p>
+                          )}
+                          <div className="flex items-center justify-between pt-1">
+                            {item.productUrl ? (
+                              <a
+                                href={item.productUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Ver producto
+                              </a>
+                            ) : (
+                              <div />
+                            )}
+                            <ChevronRight className="h-4 w-4 text-gray-400" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -661,7 +683,10 @@ export default function FutureProductsPage() {
               </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Categoría">
-                  <Input value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} placeholder="Labiales" />
+                  <Input list="category-suggestions" value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} placeholder="Labiales" />
+                  <datalist id="category-suggestions">
+                    {categories.map(c => <option key={c.name} value={c.name} />)}
+                  </datalist>
                 </Field>
                 <Field label="Prioridad">
                   <Select value={form.priority} onValueChange={v => setForm(p => ({ ...p, priority: v as Priority }))}>

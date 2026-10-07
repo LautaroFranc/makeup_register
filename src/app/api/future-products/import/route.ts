@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import FutureProduct from "@/models/FutureProduct";
+import Category from "@/models/Category";
 import Store from "@/models/Store";
 import connectDB from "@/config/db";
 import { authMiddleware } from "../../middleware";
@@ -110,6 +111,10 @@ export async function POST(req: NextRequest) {
     const existingList = await FutureProduct.find({ user: userId }).select("name _id");
     const existingMap = new Map(existingList.map(p => [p.name.toLowerCase().trim(), p]));
 
+    // Categorías existentes
+    const existingCategories = await Category.find({ user: userId, store: store._id }).select("name");
+    const existingCategorySet = new Set(existingCategories.map(c => c.name.toLowerCase().trim()));
+
     const errors: { row: number; message: string }[] = [];
     const skipped: { row: number; name: string; reason: string }[] = [];
     let created = 0;
@@ -159,10 +164,12 @@ export async function POST(req: NextRequest) {
           ? Math.round(((suggestedSellPrice - totalCost) / suggestedSellPrice) * 100)
           : undefined;
 
+      const categoryName = String(row.category || "").trim();
+
       const itemData = {
         name,
         description: String(row.description || "").trim() || undefined,
-        category: String(row.category || "").trim() || undefined,
+        category: categoryName || undefined,
         supplier: String(row.supplier || "").trim(),
         productUrl: String(row.productUrl || "").trim() || undefined,
         productCost,
@@ -181,6 +188,22 @@ export async function POST(req: NextRequest) {
         user: userId,
         store: store._id,
       };
+
+      if (categoryName && !existingCategorySet.has(categoryName.toLowerCase())) {
+        try {
+          await Category.create({
+            name: categoryName,
+            user: userId,
+            store: store._id,
+            isActive: true,
+            productCount: 0,
+            orden: 0,
+          });
+          existingCategorySet.add(categoryName.toLowerCase());
+        } catch (e) {
+          console.error(`Error al crear categoría ${categoryName}:`, e);
+        }
+      }
 
       const existing = existingMap.get(name.toLowerCase());
 
