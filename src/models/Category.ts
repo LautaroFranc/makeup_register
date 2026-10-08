@@ -1,7 +1,9 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import slugify from "slugify";
 
 export interface ICategory extends Document {
   name: string;
+  slug: string; // slug normalizado desde `name`, usado por el endpoint público
   description?: string;
   color?: string; // Color para identificar la categoría visualmente
   icon?: string; // Icono para la categoría
@@ -18,6 +20,10 @@ const CategorySchema: Schema<ICategory> = new Schema(
       type: String,
       required: true,
       trim: true,
+    },
+    slug: {
+      type: String,
+      default: "",
     },
     description: {
       type: String,
@@ -57,9 +63,20 @@ const CategorySchema: Schema<ICategory> = new Schema(
   { timestamps: true }
 );
 
+// Generar slug antes de guardar (misma convención que Users y Store).
+// El guard `if (!this.slug)` hace que el slug sea inmutable una vez creado:
+// renombrar la categoría no reescribe el slug, igual que el resto del sistema.
+CategorySchema.pre<ICategory>("save", function (next) {
+  if (!this.slug) {
+    this.slug = slugify(this.name, { lower: true, strict: true });
+  }
+  next();
+});
+
 // Índices para optimizar consultas
 CategorySchema.index({ user: 1, isActive: 1 });
 CategorySchema.index({ store: 1, isActive: 1 });
+CategorySchema.index({ user: 1, slug: 1 }); // lookup del endpoint público
 CategorySchema.index({ user: 1, store: 1, name: 1 }, { unique: true }); // Nombre único por usuario
 
 const Category: Model<ICategory> =

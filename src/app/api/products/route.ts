@@ -6,6 +6,8 @@ import { authMiddleware } from "../middleware";
 import Store from "@/models/Store";
 import GlobalDiscount from "@/models/GlobalDiscount";
 import Users from "@/models/Users";
+import Category from "@/models/Category";
+import slugify from "slugify";
 import { generateArgentineBarcode } from "@/lib/barcodeUtils";
 
 // Conectar a la base de datos antes de manejar cualquier solicitud
@@ -58,7 +60,20 @@ export async function GET(req: NextRequest) {
 
     // Filtro de categoría
     if (category && category !== "all") {
-      query.category = category;
+      const targetSlug = slugify(category, { lower: true, strict: true });
+      const activeCategories = await Category.find({
+        user: user._id,
+        isActive: true,
+      });
+      const matchedCategory = activeCategories.find(
+        (c) => slugify(String(c.name), { lower: true, strict: true }) === targetSlug
+      );
+
+      if (matchedCategory) {
+        query.category = matchedCategory.name;
+      } else {
+        query.category = category; // fallback al string original
+      }
     }
 
     // Filtro de stock

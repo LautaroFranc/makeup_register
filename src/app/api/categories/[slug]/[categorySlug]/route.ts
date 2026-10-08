@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import slugify from "slugify";
 import Category from "@/models/Category";
 import Product from "@/models/Product";
 import Users from "@/models/Users";
 import connectDB from "@/config/db";
 
 connectDB();
+
+// Normaliza tanto el valor del path como el nombre de la categoría a la misma
+// forma, así "Peluquería", "peluqueria" y "PELUQUERÍA" matchean lo mismo.
+const normalize = (value: string) => slugify(value, { lower: true, strict: true });
 
 // GET - Obtener productos de una categoría específica de un usuario
 export async function GET(
@@ -30,12 +35,35 @@ export async function GET(
       );
     }
 
-    // Buscar la categoría por slug
-    const category = await Category.findOne({
+    const target = normalize(categorySlug);
+    if (!target) {
+      // El path no aporta ningún carácter alfanumérico: no puede identificar nada.
+      return NextResponse.json(
+        { success: false, error: "Categoría no encontrada" },
+        { status: 404 }
+      );
+    }
+
+    // 1) Camino rápido: match directo por slug (usa el índice user+slug).
+    let category = await Category.findOne({
       user: user._id,
-      slug: categorySlug,
+      slug: target,
       isActive: true,
     });
+
+    // 2) Fallback: las categorías creadas antes de que existiera el campo slug no
+    //    lo tienen todavía, y el cliente puede mandar el nombre crudo con tildes.
+    //    Se normaliza el nombre de cada candidato y se compara en memoria (son
+    //    pocas categorías por usuario). Ordenado por nombre para que dos nombres
+    //    que colisionen en el mismo slug resuelvan siempre igual.
+    if (!category) {
+      const active = await Category.find({
+        user: user._id,
+        isActive: true,
+      }).sort({ name: 1 });
+
+      category = active.find((c) => normalize(String(c.name)) === target) ?? null;
+    }
 
     if (!category) {
       return NextResponse.json(
@@ -74,6 +102,7 @@ export async function GET(
       category: {
         _id: category._id,
         name: category.name,
+        slug: category.slug || target,
         description: category.description,
         color: category.color,
         icon: category.icon,
