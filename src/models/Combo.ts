@@ -11,6 +11,7 @@ export interface ICombo extends Document {
   name: string;
   description?: string;
   image?: string;
+  images?: string[];
   items: IComboItem[];
   totalNormalPrice: number; // suma(qty * unitSellPrice) — calculado al guardar
   comboPrice: number; // precio especial definido por el dueño
@@ -66,6 +67,10 @@ const ComboSchema = new Schema<ICombo>(
     },
     image: {
       type: String,
+    },
+    images: {
+      type: [String],
+      default: [],
     },
     items: {
       type: [ComboItemSchema],

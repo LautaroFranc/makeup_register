@@ -32,7 +32,9 @@ import {
   EyeOff,
   Download,
   Upload,
+  ImageIcon,
 } from "lucide-react";
+import { ImageModal } from "@/components/ImageModal";
 
 interface ComboItem {
   product: string;
@@ -47,6 +49,7 @@ interface Combo {
   name: string;
   description?: string;
   image?: string;
+  images?: string[];
   items: ComboItem[];
   totalNormalPrice: number;
   comboPrice: number;
@@ -98,6 +101,9 @@ export default function CombosPage() {
   const [form, setForm] = useState({ ...emptyForm });
   const [productSearch, setProductSearch] = useState("");
   const [importing, setImporting] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [selectedComboForImages, setSelectedComboForImages] = useState<Combo | null>(null);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -267,6 +273,45 @@ export default function CombosPage() {
     }
   };
 
+  const handleAddComboImages = async (newFiles: File[]) => {
+    if (!selectedComboForImages) return;
+    setIsUploadingImages(true);
+    try {
+      const formData = new FormData();
+      formData.append("productId", selectedComboForImages._id); // Reusamos productId en el body para compatibilidad
+      newFiles.forEach((file) => {
+        formData.append("images", file);
+      });
+
+      const res = await fetch("/api/combos/images", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` }, // FormData no lleva Content-Type
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "Imágenes agregadas correctamente" });
+        fetchCombos();
+        setSelectedComboForImages(data.data);
+      } else {
+        toast({
+          title: "Error al agregar imágenes",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudieron subir las imágenes",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingImages(false);
+    }
+  };
+
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -380,6 +425,18 @@ export default function CombosPage() {
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-base leading-tight">{combo.name}</CardTitle>
                   <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-blue-500 hover:text-blue-600"
+                      title="Gestionar imágenes"
+                      onClick={() => {
+                        setSelectedComboForImages(combo);
+                        setIsImageModalOpen(true);
+                      }}
+                    >
+                      <ImageIcon className="h-4 w-4" />
+                    </Button>
                     <Button
                       size="icon"
                       variant="ghost"
@@ -695,6 +752,17 @@ export default function CombosPage() {
           </form>
         </DialogContent>
       </Dialog>
+      {selectedComboForImages && (
+        <ImageModal
+          images={[...(selectedComboForImages.image ? [selectedComboForImages.image] : []), ...(selectedComboForImages.images || [])]}
+          isOpen={isImageModalOpen}
+          onClose={() => setIsImageModalOpen(false)}
+          productName={selectedComboForImages.name}
+          productId={selectedComboForImages._id}
+          onAddImages={handleAddComboImages}
+          isLoading={isUploadingImages}
+        />
+      )}
     </div>
   );
 }
