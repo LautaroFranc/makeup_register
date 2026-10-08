@@ -100,11 +100,20 @@ export async function GET(
           return null;
         }
 
+        // La imagen puede vivir en `image` o en `images[]` (el upload de
+        // /api/combos/images escribe en `images`), así que se merge igual
+        // que en el panel admin.
+        const gallery = [
+          ...(comboObj.image ? [comboObj.image] : []),
+          ...(comboObj.images || []),
+        ];
+
         return {
           _id: comboObj._id,
           name: comboObj.name,
           description: comboObj.description,
-          image: comboObj.image,
+          image: gallery[0] ?? null,
+          images: gallery,
           items: itemsWithAvailability,
           totalNormalPrice: comboObj.totalNormalPrice,
           comboPrice: comboObj.comboPrice,
