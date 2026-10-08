@@ -6,6 +6,7 @@ interface Product {
   code: string;
   barcode: string;
   category: string;
+  brand?: string;
   buyPrice: string;
   sellPrice: string;
   wholesalePrice?: string;
@@ -60,6 +61,7 @@ export async function exportProductsToExcel(
     Código_de_barras: p.barcode,
     Nombre: p.name,
     Categoría: p.category,
+    Marca: p.brand || "",
     "Precio compra": parseFloat(p.buyPrice),
     "Precio venta": parseFloat(p.sellPrice),
     "Precio mayorista": p.wholesalePrice ? parseFloat(p.wholesalePrice) : "",
@@ -78,6 +80,7 @@ export async function exportProductsToExcel(
     { wch: 16 },  // Barcode
     { wch: 30 },  // Nombre
     { wch: 20 },  // Categoría
+    { wch: 18 },  // Marca
     { wch: 14 },  // Precio compra
     { wch: 14 },  // Precio venta
     { wch: 16 },  // Precio mayorista

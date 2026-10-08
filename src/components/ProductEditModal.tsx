@@ -15,6 +15,7 @@ import { X, Save, Upload, Loader2, Check, ChevronLeft, ChevronRight } from "luci
 import { Switch } from "@/components/ui/switch";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { CategorySelector } from "@/components/CategorySelect";
+import { BrandSelect } from "@/components/BrandSelect";
 import { ImageUploadSquare } from "@/components/ImageUploadSquare";
 import { DynamicAttributes } from "@/components/DynamicAttributes";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +35,7 @@ interface Product {
   stock: number;
   code: string;
   category: string;
+  brand?: string;
   published: boolean;
   hasDiscount?: boolean;
   discountPercentage?: number;
@@ -74,6 +76,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
     wholesalePrice: number;
     stock: number | string;
     category: string;
+    brand: string;
     margin: number | string;
     wholesaleMargin: number | string;
     published: boolean;
@@ -89,6 +92,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
     wholesalePrice: 0,
     stock: 0,
     category: "",
+    brand: "",
     margin: 0,
     wholesaleMargin: 0,
     published: true,
@@ -125,6 +129,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
         wholesalePrice: parseFloat(product.wholesalePrice || "0"),
         stock: product.stock,
         category: product.category,
+        brand: product.brand || "",
         margin: 0,
         wholesaleMargin: 0,
         published: product.published,
@@ -235,6 +240,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
       formDataToSend.append("wholesalePrice", formData.wholesalePrice.toString());
       formDataToSend.append("stock", formData.stock === "" ? "0" : formData.stock.toString());
       formDataToSend.append("category", formData.category);
+      formDataToSend.append("brand", formData.brand.trim());
       formDataToSend.append("published", formData.published.toString());
       formDataToSend.append("hasDiscount", formData.hasDiscount.toString());
       formDataToSend.append("discountPercentage", formData.discountPercentage === "" ? "0" : formData.discountPercentage.toString());
@@ -291,6 +297,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
           wholesalePrice: formData.wholesalePrice.toString(),
           stock: Number(formData.stock) || 0,
           category: formData.category,
+          brand: formData.brand,
           images: images,
           attributes: attributes,
           published: formData.published,
@@ -396,6 +403,14 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
                         inModal={true}
                       />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="brand">Marca</Label>
+                    <BrandSelect
+                      value={formData.brand}
+                      onChange={(value) => handleInputChange("brand", value)}
+                      inModal={true}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="description">Descripción</Label>

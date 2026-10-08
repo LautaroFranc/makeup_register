@@ -13,6 +13,8 @@ export interface Product {
   code: string;
   barcode: string;
   category: string;
+  brand?: string;
+  brandSlug?: string;
   user: string;
   published: boolean;
   hasDiscount?: boolean;

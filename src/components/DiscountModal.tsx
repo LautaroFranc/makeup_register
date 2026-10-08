@@ -24,6 +24,7 @@ interface Product {
   sellPrice: string;
   stock: number;
   category: string;
+  brand?: string;
   hasDiscount?: boolean;
   discountPercentage?: number;
   discountedPrice?: string;
@@ -88,6 +89,7 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({
       formData.append("sellPrice", product.sellPrice);
       formData.append("stock", product.stock.toString());
       formData.append("category", product.category);
+      formData.append("brand", product.brand || "");
       formData.append("hasDiscount", hasDiscount.toString());
       formData.append("discountPercentage", discountPercentage.toString());
 
@@ -151,6 +153,7 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({
       formData.append("sellPrice", product.sellPrice);
       formData.append("stock", product.stock.toString());
       formData.append("category", product.category);
+      formData.append("brand", product.brand || "");
       formData.append("hasDiscount", "false");
       formData.append("discountPercentage", "0");
 

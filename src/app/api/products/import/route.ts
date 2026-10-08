@@ -5,6 +5,7 @@ import connectDB from "@/config/db";
 import { authMiddleware } from "../../middleware";
 import Store from "@/models/Store";
 import { generateArgentineBarcode } from "@/lib/barcodeUtils";
+import slugify from "slugify";
 
 connectDB();
 
@@ -18,6 +19,8 @@ const COLUMN_MAP: Record<string, string> = {
   categoria: "category",
   categoría: "category",
   category: "category",
+  marca: "brand",
+  brand: "brand",
   "precio compra": "buyPrice",
   "precio de compra": "buyPrice",
   buyprice: "buyPrice",
@@ -207,10 +210,12 @@ export async function POST(req: NextRequest) {
         discountedPrice = sellPrice.toFixed(2);
       }
 
+      const brand = String(row.brand || "").trim();
       const productData = {
         name,
         description: String(row.description || "").trim(),
         category,
+        brand,
         buyPrice: String(buyPrice),
         sellPrice: String(sellPrice),
         wholesalePrice: String(wholesalePrice),
@@ -293,12 +298,17 @@ export async function POST(req: NextRequest) {
 
     for (const { filter, data, name } of toUpdate) {
       try {
+        // findOneAndUpdate no corre el pre("save"), así que brandSlug se
+        // calcula acá a mano para que el filtro por marca no quede viejo.
+        const brand = String(data.brand || "").trim();
         await Product.findOneAndUpdate(
           filter,
           {
             $set: {
               description: data.description,
               category: data.category,
+              brand,
+              brandSlug: brand ? slugify(brand, { lower: true, strict: true }) : "",
               buyPrice: data.buyPrice,
               sellPrice: data.sellPrice,
               wholesalePrice: data.wholesalePrice,

@@ -49,6 +49,8 @@ interface Product {
   code: string;
   barcode: string;
   category: string;
+  description?: string;
+  brand?: string;
   user: string;
   published: boolean;
   hasDiscount?: boolean;
@@ -299,11 +301,14 @@ const ProductRow: React.FC<ProductRowProps> = ({
       const formData = new FormData();
       formData.append("stock", String(newStock));
       formData.append("name", product.name);
-      formData.append("description", product.name);
+      // OJO: este PUT reenvía el form completo, así que todo lo que falte acá
+      // se pisa con un valor vacío en el servidor.
+      formData.append("description", product.description || "");
       formData.append("buyPrice", product.buyPrice);
       formData.append("sellPrice", product.sellPrice);
       formData.append("wholesalePrice", product.wholesalePrice || "0");
       formData.append("category", product.category);
+      formData.append("brand", product.brand || "");
       formData.append("attributes", JSON.stringify(product.attributes || {}));
       formData.append("published", String(product.published));
       formData.append("removedImages", "[]");

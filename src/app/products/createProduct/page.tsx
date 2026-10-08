@@ -11,6 +11,7 @@ import { CurrencyInput } from "@/components/CurrencyInput";
 import { useFetch } from "@/hooks/useFetch";
 import { Product } from "@/interface/product";
 import { CategorySelector } from "@/components/CategorySelect";
+import { BrandSelect } from "@/components/BrandSelect";
 import { ImageUploadSquare } from "@/components/ImageUploadSquare";
 import { DynamicAttributes } from "@/components/DynamicAttributes";
 import { StorePreviewButton } from "@/components/StorePreviewButton";
@@ -38,6 +39,7 @@ const ProductForm = () => {
   const [wholesaleMargin, setWholesaleMargin] = useState<number | string>(0); // Margen mayorista (%)
   const [stock, setStock] = useState<number | string>(0);
   const [category, setCategory] = useState("");
+  const [brand, setBrand] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [attributes, setAttributes] = useState<{ [key: string]: string[] }>({});
@@ -130,6 +132,7 @@ const ProductForm = () => {
     formData.append("wholesalePrice", wholesalePrice + "");
     formData.append("stock", stock === "" ? "0" : stock + "");
     formData.append("category", category + "");
+    formData.append("brand", brand.trim());
     formData.append("attributes", JSON.stringify(attributes));
     formData.append("hasDiscount", hasDiscount + "");
     formData.append("discountPercentage", discountPercentage === "" ? "0" : discountPercentage + "");
@@ -222,6 +225,13 @@ const ProductForm = () => {
                     <div className="space-y-2">
                       <Label htmlFor="category">Categoría principal *</Label>
                       <CategorySelector value={category} onChange={setCategory} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="brand">Marca</Label>
+                      <BrandSelect value={brand} onChange={setBrand} />
+                      <p className="text-xs text-gray-500">
+                        Opcional. Se usa para filtrar productos en la tienda.
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="description">Descripción</Label>

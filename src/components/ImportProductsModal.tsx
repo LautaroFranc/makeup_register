@@ -139,6 +139,7 @@ export function ImportProductsModal({
       "nombre",
       "descripcion",
       "categoria",
+      "marca",
       "precio compra",
       "precio venta",
       "precio mayorista",
@@ -151,6 +152,7 @@ export function ImportProductsModal({
         "Base Líquida",
         "Base de maquillaje cobertura total",
         "Bases",
+        "Maybelline",
         1500,
         2500,
         2000,
@@ -161,6 +163,7 @@ export function ImportProductsModal({
         "Labial Mate",
         "Labial de larga duración",
         "Labiales",
+        "Rimmel",
         800,
         1400,
         1200,
@@ -171,6 +174,7 @@ export function ImportProductsModal({
         "Corrector HD",
         "",
         "Correctores",
+        "",
         600,
         1100,
         0,
@@ -187,6 +191,7 @@ export function ImportProductsModal({
       { wch: 28 }, // nombre
       { wch: 38 }, // descripcion
       { wch: 20 }, // categoria
+      { wch: 18 }, // marca
       { wch: 16 }, // precio compra
       { wch: 16 }, // precio venta
       { wch: 18 }, // precio mayorista
@@ -234,6 +239,7 @@ export function ImportProductsModal({
       ["nombre",          "✅ Sí",  "Nombre del producto",                    "Base Líquida"],
       ["descripcion",     "No",     "Descripción breve del producto",         "Cobertura total, tono medio"],
       ["categoria",       "✅ Sí",  "Categoría del producto",                 "Bases, Labiales, Correctores..."],
+      ["marca",           "No",     "Marca del producto",                     "Maybelline, Rimmel, Karely"],
       ["precio compra",   "No",     "Precio de costo (número)",               "1500"],
       ["precio venta",    "No",     "Precio de venta al público (número)",    "2500"],
       ["precio mayorista","No",     "Precio para mayoristas (número)",        "2000  (0 si no aplica)"],
@@ -369,6 +375,7 @@ export function ImportProductsModal({
                 <span>• precio mayorista</span>
                 <span>• stock</span>
                 <span>• descripcion</span>
+                <span>• marca</span>
                 <span>• publicado (si/no)</span>
               </div>
             </div>

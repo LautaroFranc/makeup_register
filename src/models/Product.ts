@@ -1,8 +1,11 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import slugify from "slugify";
 
 export interface IProduct extends Document {
   name: string;
   description: string;
+  brand: string; // Marca, tipeada a mano (ej: "Maybelline")
+  brandSlug: string; // Marca normalizada, se usa para filtrar (evita tildes/mayúsculas)
   image: string;
   images: string[]; // Múltiples imágenes
   attributes: {
@@ -40,6 +43,15 @@ const ProductSchema: Schema<IProduct> = new Schema(
     },
     description: {
       type: String,
+    },
+    brand: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    brandSlug: {
+      type: String,
+      default: "",
     },
     name: {
       type: String,
@@ -118,6 +130,16 @@ const ProductSchema: Schema<IProduct> = new Schema(
   },
   { timestamps: true }
 );
+
+// Normaliza la marca para poder filtrar sin depender de tildes ni mayúsculas.
+// A diferencia de Category.slug, se regenera en cada save: la marca no es
+// identidad de URL, el usuario la edita libremente y el slug tiene que seguirla.
+ProductSchema.pre<IProduct>("save", function (next) {
+  this.brandSlug = this.brand
+    ? slugify(this.brand, { lower: true, strict: true })
+    : "";
+  next();
+});
 
 const Product: Model<IProduct> =
   mongoose.models.Product || mongoose.model<IProduct>("Product", ProductSchema);

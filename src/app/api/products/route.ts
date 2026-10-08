@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
 
     // Filtros
     const category = searchParams.get("category");
+    const brand = searchParams.get("brand");
     const published = searchParams.get("published");
     const stockFilter = searchParams.get("stock"); // "in-stock", "low-stock", "out-of-stock"
     const search = searchParams.get("search");
@@ -77,6 +78,15 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Filtro de marca: se compara contra brandSlug, por eso se normaliza la
+    // entrada. Así "Maybelline", "maybelline" y "MAYBELLINE" matchean igual.
+    if (brand && brand !== "all") {
+      const targetBrandSlug = slugify(brand, { lower: true, strict: true });
+      if (targetBrandSlug) {
+        query.brandSlug = targetBrandSlug;
+      }
+    }
+
     // Filtro de stock
     if (stockFilter) {
       switch (stockFilter) {
@@ -98,6 +108,7 @@ export async function GET(req: NextRequest) {
         { name: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
         { category: { $regex: search, $options: "i" } },
+        { brand: { $regex: search, $options: "i" } },
       ];
     }
 
@@ -254,6 +265,15 @@ export async function GET(req: NextRequest) {
       published: true,
     });
 
+    // Marcas existentes, sin las vacías (los productos sin marca no deben
+    // aparecer como opción de filtro)
+    const availableBrands = (
+      await Product.distinct("brand", {
+        user: user._id,
+        published: true,
+      })
+    ).filter((b) => b && String(b).trim() !== "");
+
     return NextResponse.json({
       success: true,
       products: productsWithDiscount,
@@ -267,8 +287,10 @@ export async function GET(req: NextRequest) {
       },
       filters: {
         availableCategories,
+        availableBrands,
         appliedFilters: {
           category,
+          brand,
           published,
           stock: stockFilter,
           search,
@@ -615,9 +637,14 @@ export async function PUT(req: NextRequest) {
     }
 
     // Preparar los campos a actualizar
+    // OJO: findOneAndUpdate NO dispara el pre("save") del modelo, así que
+    // brandSlug hay que calcularlo acá a mano o el filtro por marca queda viejo.
+    const brand = (productData.brand || "").trim();
     const updateFields: any = {
       name: productData.name,
       description: productData.description,
+      brand,
+      brandSlug: brand ? slugify(brand, { lower: true, strict: true }) : "",
       buyPrice: productData.buyPrice,
       sellPrice: productData.sellPrice,
       wholesalePrice: wholesalePrice,
