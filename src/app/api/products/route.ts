@@ -7,6 +7,7 @@ import Store from "@/models/Store";
 import GlobalDiscount from "@/models/GlobalDiscount";
 import Users from "@/models/Users";
 import Category from "@/models/Category";
+import Combo from "@/models/Combo";
 import slugify from "slugify";
 import { generateArgentineBarcode } from "@/lib/barcodeUtils";
 
@@ -116,14 +117,19 @@ export async function GET(req: NextRequest) {
       query.$and = [...(query.$and || []), ...priceFilters];
     }
 
+    const isCombosCategory = category?.toLowerCase() === "combos" || category?.toLowerCase() === "combo";
+
     // Obtener productos con filtros y paginación
-    const products = await Product.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .select(
-        "name description image images attributes sellPrice wholesalePrice category barcode stock published hasDiscount discountPercentage discountedPrice discountStartDate discountEndDate"
-      );
+    let products = [];
+    if (!isCombosCategory) {
+      products = await Product.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select(
+          "name description image images attributes sellPrice wholesalePrice category barcode stock published hasDiscount discountPercentage discountedPrice discountStartDate discountEndDate"
+        );
+    }
 
     // Obtener la tienda activa del usuario para aplicar descuento global
     const store = await Store.findOne({ user: user._id, isActive: true });
@@ -172,8 +178,74 @@ export async function GET(req: NextRequest) {
       return productObj;
     });
 
-    // Contar total de productos con filtros para calcular páginas
-    const totalProducts = await Product.countDocuments(query);
+    // --- INTEGRACIÓN DE COMBOS ---
+    let totalProducts = 0;
+    if (!isCombosCategory) {
+      totalProducts = await Product.countDocuments(query);
+    }
+
+    // Fetch combos if category is 'combos' OR if there's a search term
+    if (isCombosCategory || search) {
+      const comboQuery: any = {
+        user: user._id,
+        published: true,
+        isActive: true,
+      };
+
+      const now = new Date();
+      comboQuery.$and = [
+        { $or: [{ startDate: { $exists: false } }, { startDate: null }, { startDate: { $lte: now } }] },
+        { $or: [{ endDate: { $exists: false } }, { endDate: null }, { endDate: { $gte: now } }] },
+      ];
+
+      if (search) {
+        comboQuery.$and.push({
+          $or: [
+            { name: { $regex: search, $options: "i" } },
+            { description: { $regex: search, $options: "i" } },
+          ],
+        });
+      }
+
+      const comboQueryBuilder = Combo.find(comboQuery).sort({ createdAt: -1 });
+      
+      if (isCombosCategory) {
+        comboQueryBuilder.skip(skip).limit(limit);
+        totalProducts = await Combo.countDocuments(comboQuery); // Override total products
+      } else if (page === 1) {
+        // Only mix combos in the first page of search results to avoid duplication across pages
+        comboQueryBuilder.limit(limit);
+      } else {
+        comboQueryBuilder.limit(0); 
+      }
+
+      const combosList = await comboQueryBuilder.exec();
+      const mappedCombos = combosList.map((c: any) => ({
+        _id: c._id.toString(),
+        name: c.name,
+        description: c.description || "",
+        image: c.image || (c.images && c.images.length > 0 ? c.images[0] : ""),
+        images: c.images || [],
+        sellPrice: c.comboPrice.toString(),
+        wholesalePrice: c.comboPrice.toString(),
+        category: "Combos",
+        barcode: "COMBO",
+        stock: 999,
+        published: true,
+        hasDiscount: c.savings > 0,
+        discountPercentage: c.totalNormalPrice > 0 ? Math.round((c.savings / c.totalNormalPrice) * 100) : 0,
+        discountedPrice: c.comboPrice.toString(),
+        isCombo: true
+      }));
+
+      // Prepend combos to the results
+      productsWithDiscount.unshift(...mappedCombos);
+      
+      if (!isCombosCategory && page === 1) {
+        totalProducts += mappedCombos.length;
+      }
+    }
+
     const totalPages = Math.ceil(totalProducts / limit);
 
     // Obtener categorías disponibles para este usuario (para filtros)

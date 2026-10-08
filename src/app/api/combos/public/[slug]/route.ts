@@ -55,6 +55,18 @@ export async function GET(
       { $or: [{ endDate: { $exists: false } }, { endDate: null }, { endDate: { $gte: now } }] },
     ];
 
+    const { searchParams } = new URL(req.url);
+    const search = searchParams.get("search");
+
+    if (search) {
+      query.$and.push({
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { description: { $regex: search, $options: "i" } },
+        ],
+      });
+    }
+
     const combos = await Combo.find(query).sort({ createdAt: -1 });
 
     // Para cada combo, verificar disponibilidad real de stock
