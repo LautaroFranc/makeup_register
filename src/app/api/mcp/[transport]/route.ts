@@ -7,24 +7,70 @@ import Store from "@/models/Store";
 import Users from "@/models/Users";
 import { generateArgentineBarcode } from "@/lib/barcodeUtils";
 import slugify from "slugify";
+import mongoose from "mongoose";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 connectDB();
 
-async function resolveDefaultContext() {
+/**
+ * Resuelve la tienda y usuario específico (por defecto Nova Insumos: "nova-insumos")
+ * para garantizar que la IA NUNCA mezcle productos de otras tiendas.
+ */
+async function resolveStoreContext(slugInput = "nova-insumos") {
   await connectDB();
-  const store: any = await Store.findOne({ isActive: true });
+  const targetSlug = slugInput?.trim().toLowerCase() || "nova-insumos";
+
+  let store: any = await Store.findOne({ slug: targetSlug, isActive: true });
+  if (!store) {
+    store = await Store.findOne({ slug: targetSlug });
+  }
+  if (!store) {
+    store = await Store.findOne({ name: { $regex: /nova/i }, isActive: true });
+  }
+
+  let userId = "";
+  let storeId = "";
+
   if (store) {
-    return { storeId: store._id.toString(), userId: store.user.toString() };
+    storeId = store._id.toString();
+    userId = store.user ? store.user.toString() : "";
+  } else {
+    const user: any = await Users.findOne({ slug: targetSlug });
+    if (user) {
+      userId = user._id.toString();
+      const userStore: any = await Store.findOne({ user: user._id, isActive: true });
+      if (userStore) storeId = userStore._id.toString();
+    }
   }
-  const user: any = await Users.findOne();
-  if (user) {
-    const userStore: any = await Store.findOne({ user: user._id });
-    return { storeId: userStore?._id.toString() || "", userId: user._id.toString() };
+
+  if (!storeId && !userId) {
+    throw new Error(`No se encontró la tienda para el slug '${targetSlug}'.`);
   }
-  throw new Error("No se encontró ninguna tienda o usuario activo en la base de datos.");
+
+  return {
+    storeId,
+    userId,
+    storeName: store?.name || "Nova Insumos",
+  };
+}
+
+function getStoreFilter(context: { storeId: string; userId: string }) {
+  const conditions: any[] = [];
+  if (context.storeId) {
+    conditions.push({ store: context.storeId });
+    try {
+      conditions.push({ store: new mongoose.Types.ObjectId(context.storeId) });
+    } catch {}
+  }
+  if (context.userId) {
+    conditions.push({ user: context.userId });
+    try {
+      conditions.push({ user: new mongoose.Types.ObjectId(context.userId) });
+    } catch {}
+  }
+  return { $or: conditions };
 }
 
 async function generateUniqueProductCode(prefix = "P") {
@@ -35,11 +81,11 @@ async function generateUniqueProductCode(prefix = "P") {
 }
 
 const handler = createMcpHandler((server: any) => {
-  // 1. LISTAR PRODUCTOS
+  // 1. LISTAR PRODUCTOS (ESTRICTAMENTE FILTRADO POR TIENDA)
   server.registerTool(
     "list_products",
     {
-      description: "Lista productos del inventario con opciones de búsqueda, filtro por categoría, marca o estado de stock.",
+      description: "Lista productos del catálogo exclusivamente de la tienda activa (por defecto Nova Insumos). Permite buscar, filtrar por categoría, marca o stock.",
       inputSchema: {
         search: z.string().optional().describe("Texto para buscar en nombre, marca o categoría"),
         category: z.string().optional().describe("Filtrar por categoría (ej: Peluquería, Manicuría, Rostro)"),
@@ -49,38 +95,50 @@ const handler = createMcpHandler((server: any) => {
           .optional()
           .describe("Filtrar por estado de stock"),
         limit: z.number().optional().default(50).describe("Límite de productos a retornar (máx 100)"),
+        storeSlug: z
+          .string()
+          .optional()
+          .default("nova-insumos")
+          .describe("Slug de la tienda a consultar. Por defecto: 'nova-insumos'"),
       },
     },
-    async ({ search, category, brand, stockStatus = "all", limit = 50 }: any) => {
+    async ({ search, category, brand, stockStatus = "all", limit = 50, storeSlug = "nova-insumos" }: any) => {
       await connectDB();
-      const query: any = {};
+      const context = await resolveStoreContext(storeSlug);
+      const storeFilter = getStoreFilter(context);
+
+      const filterConditions: any[] = [storeFilter];
 
       if (search) {
-        query.$or = [
-          { name: { $regex: search, $options: "i" } },
-          { brand: { $regex: search, $options: "i" } },
-          { category: { $regex: search, $options: "i" } },
-        ];
+        filterConditions.push({
+          $or: [
+            { name: { $regex: search, $options: "i" } },
+            { brand: { $regex: search, $options: "i" } },
+            { category: { $regex: search, $options: "i" } },
+          ],
+        });
       }
 
       if (category) {
-        query.category = { $regex: new RegExp(`^${category}$`, "i") };
+        filterConditions.push({ category: { $regex: new RegExp(`^${category}$`, "i") } });
       }
 
       if (brand) {
-        query.brand = { $regex: new RegExp(`^${brand}$`, "i") };
+        filterConditions.push({ brand: { $regex: new RegExp(`^${brand}$`, "i") } });
       }
 
       if (stockStatus === "in_stock") {
-        query.stock = { $gt: 0 };
+        filterConditions.push({ stock: { $gt: 0 } });
       } else if (stockStatus === "low_stock") {
-        query.stock = { $gt: 0, $lte: 5 };
+        filterConditions.push({ stock: { $gt: 0, $lte: 5 } });
       } else if (stockStatus === "out_of_stock") {
-        query.stock = { $lte: 0 };
+        filterConditions.push({ stock: { $lte: 0 } });
       }
 
+      const finalQuery = { $and: filterConditions };
       const safeLimit = Math.min(Math.max(limit, 1), 100);
-      const products = await Product.find(query)
+
+      const products = await Product.find(finalQuery)
         .sort({ createdAt: -1 })
         .limit(safeLimit)
         .lean();
@@ -114,6 +172,8 @@ const handler = createMcpHandler((server: any) => {
             type: "text",
             text: JSON.stringify(
               {
+                tienda: context.storeName,
+                slug: storeSlug,
                 totalResultados: formatted.length,
                 productos: formatted,
               },
@@ -187,7 +247,7 @@ const handler = createMcpHandler((server: any) => {
   server.registerTool(
     "create_product",
     {
-      description: "Crea un nuevo producto en el inventario con código y código de barras argentino EAN-13 generados automáticamente.",
+      description: "Crea un nuevo producto en Nova Insumos con código interno y código de barras argentino EAN-13 generados automáticamente.",
       inputSchema: {
         name: z.string().describe("Nombre del producto"),
         sellPrice: z.number().describe("Precio de venta al público en ARS"),
@@ -209,6 +269,7 @@ const handler = createMcpHandler((server: any) => {
         hasDiscount: z.boolean().optional().default(false).describe("Si tiene descuento activo"),
         discountPercentage: z.number().optional().default(0).describe("Porcentaje de descuento"),
         published: z.boolean().optional().default(true).describe("Visibilidad pública en la tienda"),
+        storeSlug: z.string().optional().default("nova-insumos").describe("Slug de la tienda destino"),
       },
     },
     async ({
@@ -224,9 +285,10 @@ const handler = createMcpHandler((server: any) => {
       hasDiscount = false,
       discountPercentage = 0,
       published = true,
+      storeSlug = "nova-insumos",
     }: any) => {
       await connectDB();
-      const context = await resolveDefaultContext();
+      const context = await resolveStoreContext(storeSlug);
 
       const code = await generateUniqueProductCode();
       const barcode = generateArgentineBarcode("EAN13");
@@ -264,7 +326,7 @@ const handler = createMcpHandler((server: any) => {
             type: "text",
             text: JSON.stringify(
               {
-                mensaje: "Producto creado exitosamente",
+                mensaje: `Producto creado exitosamente en ${context.storeName}`,
                 producto: {
                   id: newProduct._id.toString(),
                   name: newProduct.name,
@@ -381,20 +443,27 @@ const handler = createMcpHandler((server: any) => {
     }
   );
 
-  // 5. LISTAR COMBOS
-  server.registerTool(
+  // 5. LISTAR COMBOS (ESTRICTAMENTE FILTRADO POR TIENDA)
+  server.tool(
     "list_combos",
     {
-      description: "Lista todos los combos configurados, sus productos componentes, precio promocional y ahorro generado.",
+      description: "Lista los combos configurados exclusivamente para la tienda activa (por defecto Nova Insumos).",
       inputSchema: {
         activeOnly: z.boolean().optional().default(false).describe("Si es true, solo devuelve combos activos y publicados"),
+        storeSlug: z.string().optional().default("nova-insumos").describe("Slug de la tienda a consultar"),
       },
     },
-    async ({ activeOnly = false }: any) => {
+    async ({ activeOnly = false, storeSlug = "nova-insumos" }: any) => {
       await connectDB();
-      const query = activeOnly ? { isActive: true, published: true } : {};
+      const context = await resolveStoreContext(storeSlug);
+      const storeFilter = getStoreFilter(context);
 
-      const combos = await Combo.find(query).sort({ createdAt: -1 }).lean();
+      const conditions: any[] = [storeFilter];
+      if (activeOnly) {
+        conditions.push({ isActive: true, published: true });
+      }
+
+      const combos = await Combo.find({ $and: conditions }).sort({ createdAt: -1 }).lean();
 
       const formatted = combos.map((c: any) => ({
         id: c._id.toString(),
@@ -421,6 +490,7 @@ const handler = createMcpHandler((server: any) => {
             type: "text",
             text: JSON.stringify(
               {
+                tienda: context.storeName,
                 totalCombos: formatted.length,
                 combos: formatted,
               },
@@ -437,7 +507,7 @@ const handler = createMcpHandler((server: any) => {
   server.registerTool(
     "create_combo",
     {
-      description: "Crea un combo agrupando productos existentes, calculando automáticamente el precio normal total y el ahorro para el cliente.",
+      description: "Crea un combo en Nova Insumos agrupando productos existentes, calculando automáticamente el precio normal total y el ahorro para el cliente.",
       inputSchema: {
         name: z.string().describe("Nombre atractivo del combo (ej: Kit Reparación Total)"),
         comboPrice: z.number().describe("Precio final promocional del combo en ARS"),
@@ -451,11 +521,12 @@ const handler = createMcpHandler((server: any) => {
           .describe("Lista de productos y cantidades que componen el combo"),
         description: z.string().optional().describe("Descripción de los beneficios del combo"),
         published: z.boolean().optional().default(true).describe("Publicar en la tienda"),
+        storeSlug: z.string().optional().default("nova-insumos").describe("Slug de la tienda destino"),
       },
     },
-    async ({ name, comboPrice, items, description = "", published = true }: any) => {
+    async ({ name, comboPrice, items, description = "", published = true, storeSlug = "nova-insumos" }: any) => {
       await connectDB();
-      const context = await resolveDefaultContext();
+      const context = await resolveStoreContext(storeSlug);
 
       if (!items || items.length === 0) {
         return { content: [{ type: "text", text: "Error: El combo debe tener al menos un producto." }] };
@@ -502,7 +573,7 @@ const handler = createMcpHandler((server: any) => {
             type: "text",
             text: JSON.stringify(
               {
-                mensaje: "Combo creado exitosamente",
+                mensaje: `Combo creado exitosamente en ${context.storeName}`,
                 combo: {
                   id: newCombo._id.toString(),
                   name: newCombo.name,
@@ -611,19 +682,23 @@ const handler = createMcpHandler((server: any) => {
     }
   );
 
-  // 8. ANÁLISIS INTEGRAL DE INVENTARIO PARA LA IA
+  // 8. ANÁLISIS INTEGRAL DE INVENTARIO (ESTRICTAMENTE FILTRADO POR TIENDA)
   server.registerTool(
     "analyze_inventory",
     {
-      description: "Genera un reporte ejecutivo completo del inventario: valorización a costo, valorización a venta, margen promedio, alertas de stock y métricas para tomar decisiones comerciales.",
-      inputSchema: {},
+      description: "Genera un reporte ejecutivo completo exclusivamente para la tienda activa (Nova Insumos): valorización a costo, valorización a venta, margen promedio, alertas de stock y métricas comerciales.",
+      inputSchema: {
+        storeSlug: z.string().optional().default("nova-insumos").describe("Slug de la tienda a analizar"),
+      },
     },
-    async () => {
+    async ({ storeSlug = "nova-insumos" }: any = {}) => {
       await connectDB();
+      const context = await resolveStoreContext(storeSlug);
+      const storeFilter = getStoreFilter(context);
 
       const [products, combos] = await Promise.all([
-        Product.find().lean(),
-        Combo.find().lean(),
+        Product.find(storeFilter).lean(),
+        Combo.find(storeFilter).lean(),
       ]);
 
       let totalValuationCost = 0;
@@ -678,6 +753,8 @@ const handler = createMcpHandler((server: any) => {
             type: "text",
             text: JSON.stringify(
               {
+                tienda: context.storeName,
+                slug: storeSlug,
                 resumenInventario: {
                   totalProductos: products.length,
                   totalCombos: combos.length,

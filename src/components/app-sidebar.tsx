@@ -45,6 +45,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter, usePathname } from "next/navigation";
 import { useUser } from "@/contexts/UserContext";
+import { ConnectAiModal } from "@/components/ConnectAiModal";
+import { Bot } from "lucide-react";
 
 // Secciones del menú agrupadas
 const menuGroups = [
@@ -185,6 +187,8 @@ export function AppSidebar() {
     Promociones: true,
   });
 
+  const [connectAiOpen, setConnectAiOpen] = useState(false);
+
   const toggleSubMenu = (title: string) => {
     setOpenSubMenus((prev) => ({
       ...prev,
@@ -217,7 +221,24 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-2 py-3 space-y-4">
+      <SidebarContent className="px-2 py-3 space-y-3">
+        {/* Botón Destacado: Conectar Asistente IA */}
+        <div className="px-1">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setConnectAiOpen(true)}
+            className="w-full justify-between h-9 px-3 bg-gradient-to-r from-amber-500/10 via-primary/10 to-emerald-500/10 hover:from-amber-500/20 hover:to-emerald-500/20 border-primary/25 text-foreground font-semibold text-xs rounded-lg shadow-2xs group transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5 text-amber-500 animate-pulse group-hover:rotate-12 transition-transform" />
+              <span>Conectar IA</span>
+            </div>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-primary/15 text-primary tracking-tight">
+              GPT / Claude
+            </span>
+          </Button>
+        </div>
         {menuGroups.map((group, groupIdx) => (
           <SidebarGroup key={groupIdx} className="p-0">
             <SidebarGroupLabel className="px-3 text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-wider mb-1">
@@ -395,6 +416,9 @@ export function AppSidebar() {
           </div>
         )}
       </SidebarFooter>
+
+      {/* Modal para conectar Asistente IA (ChatGPT / Claude) */}
+      <ConnectAiModal open={connectAiOpen} onOpenChange={setConnectAiOpen} />
     </Sidebar>
   );
 }

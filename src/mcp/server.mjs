@@ -130,18 +130,59 @@ async function ensureDB() {
   console.error("Conectado a MongoDB para el servidor MCP.");
 }
 
-async function resolveDefaultContext() {
+async function resolveStoreContext(slugInput = "nova-insumos") {
   await ensureDB();
-  const store = await Store.findOne({ isActive: true });
+  const targetSlug = slugInput?.trim().toLowerCase() || "nova-insumos";
+
+  let store = await Store.findOne({ slug: targetSlug, isActive: true });
+  if (!store) {
+    store = await Store.findOne({ slug: targetSlug });
+  }
+  if (!store) {
+    store = await Store.findOne({ name: { $regex: /nova/i }, isActive: true });
+  }
+
+  let userId = "";
+  let storeId = "";
+
   if (store) {
-    return { storeId: store._id, userId: store.user };
+    storeId = store._id.toString();
+    userId = store.user ? store.user.toString() : "";
+  } else {
+    const user = await User.findOne({ slug: targetSlug });
+    if (user) {
+      userId = user._id.toString();
+      const userStore = await Store.findOne({ user: user._id, isActive: true });
+      if (userStore) storeId = userStore._id.toString();
+    }
   }
-  const user = await User.findOne();
-  if (user) {
-    const userStore = await Store.findOne({ user: user._id });
-    return { storeId: userStore?._id, userId: user._id };
+
+  if (!storeId && !userId) {
+    throw new Error(`No se encontró la tienda para el slug '${targetSlug}'.`);
   }
-  throw new Error("No se encontró ninguna tienda o usuario activo en la base de datos.");
+
+  return {
+    storeId,
+    userId,
+    storeName: store?.name || "Nova Insumos",
+  };
+}
+
+function getStoreFilter(context) {
+  const conditions = [];
+  if (context.storeId) {
+    conditions.push({ store: context.storeId });
+    try {
+      conditions.push({ store: new mongoose.Types.ObjectId(context.storeId) });
+    } catch {}
+  }
+  if (context.userId) {
+    conditions.push({ user: context.userId });
+    try {
+      conditions.push({ user: new mongoose.Types.ObjectId(context.userId) });
+    } catch {}
+  }
+  return { $or: conditions };
 }
 
 function calculateEAN13CheckDigit(code) {
@@ -175,10 +216,10 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
-// 1. LISTAR PRODUCTOS
+// 1. LISTAR PRODUCTOS (FILTRADO ESTRICTAMENTE POR NOVA INSUMOS)
 server.tool(
   "list_products",
-  "Lista productos del inventario con opciones de búsqueda, filtro por categoría, marca o estado de stock.",
+  "Lista productos del catálogo exclusivamente de la tienda activa (por defecto Nova Insumos). Permite buscar, filtrar por categoría, marca o stock.",
   {
     search: z.string().optional().describe("Texto para buscar en nombre, marca o descripción"),
     category: z.string().optional().describe("Filtrar por categoría (ej: Peluquería, Uñas, Rostro)"),
@@ -188,37 +229,48 @@ server.tool(
       .optional()
       .describe("Filtrar por estado de stock (low_stock: 5 unidades o menos)"),
     limit: z.number().optional().default(50).describe("Límite de productos a retornar (máx 100)"),
+    storeSlug: z
+      .string()
+      .optional()
+      .default("nova-insumos")
+      .describe("Slug de la tienda a consultar. Por defecto: 'nova-insumos'"),
   },
-  async ({ search, category, brand, stockStatus = "all", limit = 50 }) => {
+  async ({ search, category, brand, stockStatus = "all", limit = 50, storeSlug = "nova-insumos" }) => {
     await ensureDB();
-    const query = {};
+    const context = await resolveStoreContext(storeSlug);
+    const storeFilter = getStoreFilter(context);
+
+    const filterConditions = [storeFilter];
 
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { brand: { $regex: search, $options: "i" } },
-        { category: { $regex: search, $options: "i" } },
-      ];
+      filterConditions.push({
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { brand: { $regex: search, $options: "i" } },
+          { category: { $regex: search, $options: "i" } },
+        ],
+      });
     }
 
     if (category) {
-      query.category = { $regex: new RegExp(`^${category}$`, "i") };
+      filterConditions.push({ category: { $regex: new RegExp(`^${category}$`, "i") } });
     }
 
     if (brand) {
-      query.brand = { $regex: new RegExp(`^${brand}$`, "i") };
+      filterConditions.push({ brand: { $regex: new RegExp(`^${brand}$`, "i") } });
     }
 
     if (stockStatus === "in_stock") {
-      query.stock = { $gt: 0 };
+      filterConditions.push({ stock: { $gt: 0 } });
     } else if (stockStatus === "low_stock") {
-      query.stock = { $gt: 0, $lte: 5 };
+      filterConditions.push({ stock: { $gt: 0, $lte: 5 } });
     } else if (stockStatus === "out_of_stock") {
-      query.stock = { $lte: 0 };
+      filterConditions.push({ stock: { $lte: 0 } });
     }
 
+    const finalQuery = { $and: filterConditions };
     const safeLimit = Math.min(Math.max(limit, 1), 100);
-    const products = await Product.find(query)
+    const products = await Product.find(finalQuery)
       .sort({ createdAt: -1 })
       .limit(safeLimit)
       .lean();
@@ -252,6 +304,8 @@ server.tool(
           type: "text",
           text: JSON.stringify(
             {
+              tienda: context.storeName,
+              slug: storeSlug,
               totalResultados: formatted.length,
               productos: formatted,
             },
@@ -321,7 +375,7 @@ server.tool(
 // 3. CREAR UN PRODUCTO
 server.tool(
   "create_product",
-  "Crea un nuevo producto en el inventario con código y código de barras argentino EAN-13 generados automáticamente.",
+  "Crea un nuevo producto en Nova Insumos con código interno y código de barras argentino EAN-13 generados automáticamente.",
   {
     name: z.string().describe("Nombre del producto"),
     sellPrice: z.number().describe("Precio de venta al público en ARS"),
@@ -343,6 +397,7 @@ server.tool(
     hasDiscount: z.boolean().optional().default(false).describe("Si tiene descuento activo"),
     discountPercentage: z.number().optional().default(0).describe("Porcentaje de descuento"),
     published: z.boolean().optional().default(true).describe("Visibilidad pública en la tienda"),
+    storeSlug: z.string().optional().default("nova-insumos").describe("Slug de la tienda destino. Por defecto 'nova-insumos'"),
   },
   async ({
     name,
@@ -357,9 +412,10 @@ server.tool(
     hasDiscount = false,
     discountPercentage = 0,
     published = true,
+    storeSlug = "nova-insumos",
   }) => {
     await ensureDB();
-    const context = await resolveDefaultContext();
+    const context = await resolveStoreContext(storeSlug);
 
     const code = await generateUniqueProductCode();
     const barcode = generateArgentineBarcode();
@@ -397,7 +453,7 @@ server.tool(
           type: "text",
           text: JSON.stringify(
             {
-              mensaje: "Producto creado exitosamente",
+              mensaje: `Producto creado exitosamente en ${context.storeName}`,
               producto: {
                 id: newProduct._id.toString(),
                 name: newProduct.name,
@@ -513,18 +569,25 @@ server.tool(
   }
 );
 
-// 5. LISTAR COMBOS
+// 5. LISTAR COMBOS (FILTRADO POR TIENDA)
 server.tool(
   "list_combos",
-  "Lista todos los combos configurados, sus productos componentes, precio promocional y ahorro generado.",
+  "Lista los combos configurados exclusivamente para la tienda activa (por defecto Nova Insumos).",
   {
     activeOnly: z.boolean().optional().default(false).describe("Si es true, solo devuelve combos activos y publicados"),
+    storeSlug: z.string().optional().default("nova-insumos").describe("Slug de la tienda a consultar. Por defecto 'nova-insumos'"),
   },
-  async ({ activeOnly = false }) => {
+  async ({ activeOnly = false, storeSlug = "nova-insumos" }) => {
     await ensureDB();
-    const query = activeOnly ? { isActive: true, published: true } : {};
+    const context = await resolveStoreContext(storeSlug);
+    const storeFilter = getStoreFilter(context);
 
-    const combos = await Combo.find(query).sort({ createdAt: -1 }).lean();
+    const conditions = [storeFilter];
+    if (activeOnly) {
+      conditions.push({ isActive: true, published: true });
+    }
+
+    const combos = await Combo.find({ $and: conditions }).sort({ createdAt: -1 }).lean();
 
     const formatted = combos.map((c) => ({
       id: c._id.toString(),
@@ -551,6 +614,7 @@ server.tool(
           type: "text",
           text: JSON.stringify(
             {
+              tienda: context.storeName,
               totalCombos: formatted.length,
               combos: formatted,
             },
@@ -566,7 +630,7 @@ server.tool(
 // 6. CREAR UN COMBO
 server.tool(
   "create_combo",
-  "Crea un combo agrupando productos existentes, calculando automáticamente el precio normal total y el ahorro para el cliente.",
+  "Crea un combo en Nova Insumos agrupando productos existentes, calculando automáticamente el precio normal total y el ahorro para el cliente.",
   {
     name: z.string().describe("Nombre atractivo del combo (ej: Kit Reparación Total)"),
     comboPrice: z.number().describe("Precio final promocional del combo en ARS"),
@@ -580,10 +644,11 @@ server.tool(
       .describe("Lista de productos y cantidades que componen el combo"),
     description: z.string().optional().describe("Descripción de los beneficios del combo"),
     published: z.boolean().optional().default(true).describe("Publicar en la tienda"),
+    storeSlug: z.string().optional().default("nova-insumos").describe("Slug de la tienda destino. Por defecto 'nova-insumos'"),
   },
-  async ({ name, comboPrice, items, description = "", published = true }) => {
+  async ({ name, comboPrice, items, description = "", published = true, storeSlug = "nova-insumos" }) => {
     await ensureDB();
-    const context = await resolveDefaultContext();
+    const context = await resolveStoreContext(storeSlug);
 
     if (!items || items.length === 0) {
       return { content: [{ type: "text", text: "Error: El combo debe tener al menos un producto." }] };
@@ -737,17 +802,21 @@ server.tool(
   }
 );
 
-// 8. ANÁLISIS INTEGRAL DE INVENTARIO PARA LA IA
+// 8. ANÁLISIS INTEGRAL DE INVENTARIO (FILTRADO POR TIENDA)
 server.tool(
   "analyze_inventory",
-  "Genera un reporte ejecutivo completo del inventario: valorización a costo, valorización a venta, margen promedio, alertas de stock y métricas para tomar decisiones comerciales.",
-  {},
-  async () => {
+  "Genera un reporte ejecutivo completo exclusivamente para la tienda activa (Nova Insumos): valorización a costo, valorización a venta, margen promedio, alertas de stock y métricas comerciales.",
+  {
+    storeSlug: z.string().optional().default("nova-insumos").describe("Slug de la tienda a analizar. Por defecto 'nova-insumos'"),
+  },
+  async ({ storeSlug = "nova-insumos" } = {}) => {
     await ensureDB();
+    const context = await resolveStoreContext(storeSlug);
+    const storeFilter = getStoreFilter(context);
 
     const [products, combos] = await Promise.all([
-      Product.find().lean(),
-      Combo.find().lean(),
+      Product.find(storeFilter).lean(),
+      Combo.find(storeFilter).lean(),
     ]);
 
     let totalValuationCost = 0;
@@ -802,6 +871,8 @@ server.tool(
           type: "text",
           text: JSON.stringify(
             {
+              tienda: context.storeName,
+              slug: storeSlug,
               resumenInventario: {
                 totalProductos: products.length,
                 totalCombos: combos.length,
