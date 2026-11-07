@@ -7,6 +7,53 @@ import { authMiddleware } from "../../middleware";
 // Conectar a la base de datos
 connectDB();
 
+export async function DELETE(req: NextRequest) {
+  try {
+    const authCheck = await authMiddleware(req);
+    if (authCheck.status !== 200) return authCheck;
+    const userId = (await authCheck.json()).user._id;
+
+    const { comboId, image } = await req.json();
+
+    if (!comboId || !image) {
+      return NextResponse.json(
+        { success: false, error: "Combo ID e imagen requeridos" },
+        { status: 400 }
+      );
+    }
+
+    // Verificar que el combo pertenece al usuario
+    const combo = await Combo.findById(comboId);
+    if (!combo || String(combo.user) !== String(userId)) {
+      return NextResponse.json(
+        { success: false, error: "Combo no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    // Quitar la imagen de `images`; si la imagen era la principal también
+    // limpiar `image`, porque ImageModal las mergea.
+    const update: any = { $pull: { images: image } };
+    if (combo.image === image) {
+      update.$set = { image: null };
+    }
+
+    const updatedCombo = await Combo.findByIdAndUpdate(comboId, update, {
+      new: true,
+    });
+
+    return NextResponse.json(
+      { success: true, data: updatedCombo },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(req: NextRequest) {
   try {
     const authCheck = await authMiddleware(req);

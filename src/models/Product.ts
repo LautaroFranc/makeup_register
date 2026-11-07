@@ -1,6 +1,11 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 import slugify from "slugify";
 
+export interface IProductSection {
+  title: string;
+  content: string;
+}
+
 export interface IProduct extends Document {
   name: string;
   description: string;
@@ -11,6 +16,7 @@ export interface IProduct extends Document {
   attributes: {
     [key: string]: string[]; // Atributos dinámicos: { "color": ["rojo", "azul"], "tamaño": ["S", "M", "L"] }
   };
+  sections?: IProductSection[]; // Secciones/pestañas dinámicas (ej: "Resultados y Beneficios", "Modo de uso", etc.)
   buyPrice: string;
   sellPrice: string;
   wholesalePrice: string; // Precio mayorista
@@ -67,6 +73,15 @@ const ProductSchema: Schema<IProduct> = new Schema(
     attributes: {
       type: Schema.Types.Mixed,
       default: {},
+    },
+    sections: {
+      type: [
+        {
+          title: { type: String, required: true },
+          content: { type: String, required: true },
+        },
+      ],
+      default: [],
     },
     buyPrice: {
       type: String,

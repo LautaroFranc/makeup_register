@@ -18,6 +18,7 @@ import { StorePreviewButton } from "@/components/StorePreviewButton";
 import { ImportProductsModal } from "@/components/ImportProductsModal";
 import { Check, ChevronRight, ChevronLeft, Save, FileSpreadsheet } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { SectionsManager, ProductSection } from "@/components/SectionsManager";
 
 const ProductForm = () => {
   const [step, setStep] = useState(1);
@@ -48,6 +49,7 @@ const ProductForm = () => {
   const [discountStartDate, setDiscountStartDate] = useState("");
   const [discountEndDate, setDiscountEndDate] = useState("");
   const [published, setPublished] = useState(true);
+  const [sections, setSections] = useState<ProductSection[]>([]);
   
   const { toast } = useToast();
   const { data, error, loading, fetchData } = useFetch<Product[]>();
@@ -109,6 +111,7 @@ const ProductForm = () => {
       setDiscountStartDate("");
       setDiscountEndDate("");
       setPublished(true);
+      setSections([]);
     }
   }, [data]);
 
@@ -137,6 +140,7 @@ const ProductForm = () => {
     formData.append("hasDiscount", hasDiscount + "");
     formData.append("discountPercentage", discountPercentage === "" ? "0" : discountPercentage + "");
     formData.append("published", published + "");
+    formData.append("sections", JSON.stringify(sections));
     if (discountStartDate) formData.append("discountStartDate", discountStartDate);
     if (discountEndDate) formData.append("discountEndDate", discountEndDate);
 
@@ -241,6 +245,12 @@ const ProductForm = () => {
                         onChange={(e) => setDescription(e.target.value)}
                         placeholder="Cuéntale a tus clientes sobre este producto"
                         rows={4}
+                      />
+                    </div>
+                    <div className="pt-2 border-t">
+                      <SectionsManager
+                        sections={sections}
+                        onChange={setSections}
                       />
                     </div>
                   </div>

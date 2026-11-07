@@ -104,6 +104,7 @@ export default function CombosPage() {
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [selectedComboForImages, setSelectedComboForImages] = useState<Combo | null>(null);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [isDeletingImage, setIsDeletingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -309,6 +310,42 @@ export default function CombosPage() {
       });
     } finally {
       setIsUploadingImages(false);
+    }
+  };
+
+  const handleDeleteComboImage = async (image: string) => {
+    if (!selectedComboForImages) return;
+    setIsDeletingImage(true);
+    try {
+      const res = await fetch("/api/combos/images", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ comboId: selectedComboForImages._id, image }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setSelectedComboForImages(data.data);
+        fetchCombos();
+        toast({ title: "Imagen eliminada correctamente" });
+      } else {
+        toast({
+          title: "Error al eliminar imagen",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la imagen",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingImage(false);
     }
   };
 
@@ -760,7 +797,9 @@ export default function CombosPage() {
           productName={selectedComboForImages.name}
           productId={selectedComboForImages._id}
           onAddImages={handleAddComboImages}
+          onDeleteImage={handleDeleteComboImage}
           isLoading={isUploadingImages}
+          isDeleting={isDeletingImage}
         />
       )}
     </div>

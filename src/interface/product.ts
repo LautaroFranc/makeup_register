@@ -7,6 +7,7 @@ export interface Product {
   attributes?: {
     [key: string]: string[];
   };
+  sections?: { title: string; content: string }[];
   buyPrice: string;
   sellPrice: string;
   stock: number;

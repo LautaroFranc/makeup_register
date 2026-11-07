@@ -44,8 +44,10 @@ export async function exportCombosToExcel(filename = "combos") {
         "Pre-venta": c.allowOversell ? "Sí" : "No",
         "Ocultar sin stock": c.autoHideWhenOutOfStock ? "Sí" : "No",
         "Productos": itemsStr,
-        "Válido Desde": c.startDate ? new Date(c.startDate).toLocaleDateString("es-AR") : "",
-        "Válido Hasta": c.endDate ? new Date(c.endDate).toLocaleDateString("es-AR") : "",
+        // Fecha date-only en UTC. toLocaleDateString("es-AR") daba "8/11/2026"
+        // (día/mes de 1 dígito) y al reimportar corría el día.
+        "Válido Desde": c.startDate ? new Date(c.startDate).toISOString().slice(0, 10) : "",
+        "Válido Hasta": c.endDate ? new Date(c.endDate).toISOString().slice(0, 10) : "",
       };
     });
   }

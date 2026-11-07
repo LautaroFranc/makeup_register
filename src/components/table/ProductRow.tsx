@@ -42,6 +42,7 @@ interface Product {
   attributes?: {
     [key: string]: string[];
   };
+  sections?: any[];
   buyPrice: string;
   sellPrice: string;
   wholesalePrice?: string;
@@ -310,6 +311,7 @@ const ProductRow: React.FC<ProductRowProps> = ({
       formData.append("category", product.category);
       formData.append("brand", product.brand || "");
       formData.append("attributes", JSON.stringify(product.attributes || {}));
+      formData.append("sections", JSON.stringify(product.sections || []));
       formData.append("published", String(product.published));
       formData.append("removedImages", "[]");
 

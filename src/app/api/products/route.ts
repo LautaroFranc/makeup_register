@@ -138,7 +138,7 @@ export async function GET(req: NextRequest) {
         .skip(skip)
         .limit(limit)
         .select(
-          "name description image images attributes sellPrice wholesalePrice category barcode stock published hasDiscount discountPercentage discountedPrice discountStartDate discountEndDate"
+          "name description image images attributes sections sellPrice wholesalePrice category barcode stock published hasDiscount discountPercentage discountedPrice discountStartDate discountEndDate"
         );
     }
 
@@ -414,11 +414,24 @@ export async function POST(req: NextRequest) {
       targetStoreId = store._id.toString();
     }
 
+    // Procesar secciones dinámicas (acordeones)
+    let parsedSections: any[] = [];
+    if (productData.sections) {
+      try {
+        parsedSections = typeof productData.sections === "string"
+          ? JSON.parse(productData.sections)
+          : productData.sections;
+      } catch (e) {
+        parsedSections = [];
+      }
+    }
+
     const newProduct = await Product.create({
       ...productData,
       image: uploadedImage?.secure_url || null,
       images: uploadedMultipleImages,
       attributes: attributes,
+      sections: Array.isArray(parsedSections) ? parsedSections : [],
       code: newProductCode,
       barcode: barcode,
       user: userId,
@@ -660,6 +673,18 @@ export async function PUT(req: NextRequest) {
       discountStartDate: productData.discountStartDate || null,
       discountEndDate: productData.discountEndDate || null,
     };
+
+    // Procesar secciones dinámicas si se envían
+    if (productData.sections !== undefined) {
+      try {
+        const parsedSections = typeof productData.sections === "string"
+          ? JSON.parse(productData.sections)
+          : productData.sections;
+        updateFields.sections = Array.isArray(parsedSections) ? parsedSections : [];
+      } catch (e) {
+        updateFields.sections = [];
+      }
+    }
 
     // Agregar imagen principal si se subió una nueva
     if (uploadedMainImageUrl) {

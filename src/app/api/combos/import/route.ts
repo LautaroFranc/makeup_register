@@ -41,16 +41,30 @@ function parseBoolean(val: any, defaultVal: boolean): boolean {
 
 function parseDate(val: any): Date | undefined {
   if (!val) return undefined;
-  // Intenta parsear fecha de Excel (número) o string DD/MM/YYYY o ISO
+  if (val instanceof Date) return val;
+  // Serial de Excel: días desde 1900-01-01 → medianoche UTC
   if (typeof val === "number") {
     return new Date(Math.round((val - 25569) * 86400 * 1000));
   }
   const str = String(val).trim();
-  // Simple check for DD/MM/YYYY
+  if (!str) return undefined;
+
+  // ISO date-only (YYYY-MM-DD) → medianoche UTC, igual que el resto del sistema.
+  // Sin esto, `new Date("2026-11-7")` (día de 1 dígito, como exporta es-AR) es
+  // Invalid Date en V8 y la actualización falla con "Cast to date failed".
+  const iso = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) {
+    const d = new Date(Date.UTC(+iso[1], +iso[2] - 1, +iso[3]));
+    return isNaN(d.getTime()) ? undefined : d;
+  }
+
+  // DD/MM/YYYY o D/M/YYYY (formato es-AR)
   const parts = str.split("/");
   if (parts.length === 3) {
-    return new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00`);
+    const d = new Date(Date.UTC(+parts[2], +parts[1] - 1, +parts[0]));
+    return isNaN(d.getTime()) ? undefined : d;
   }
+
   const date = new Date(str);
   return isNaN(date.getTime()) ? undefined : date;
 }

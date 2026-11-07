@@ -19,6 +19,7 @@ import { BrandSelect } from "@/components/BrandSelect";
 import { ImageUploadSquare } from "@/components/ImageUploadSquare";
 import { DynamicAttributes } from "@/components/DynamicAttributes";
 import { useToast } from "@/hooks/use-toast";
+import { SectionsManager, ProductSection } from "@/components/SectionsManager";
 
 interface Product {
   _id: string;
@@ -29,6 +30,7 @@ interface Product {
   attributes?: {
     [key: string]: string[];
   };
+  sections?: ProductSection[];
   buyPrice: string;
   sellPrice: string;
   wholesalePrice?: string;
@@ -107,6 +109,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
   const [removedImages, setRemovedImages] = useState<string[]>([]);
   const [uploadedMainImage, setUploadedMainImage] = useState<File | null>(null);
   const [attributes, setAttributes] = useState<{ [key: string]: string[] }>({});
+  const [sections, setSections] = useState<ProductSection[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -141,6 +144,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
       setImage(product.image || "");
       setImages(product.images || []);
       setAttributes(product.attributes || {});
+      setSections(product.sections || []);
       setUploadedImages([]);
       setUploadedMainImage(null);
       setRemovedImages([]);
@@ -246,6 +250,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
       formDataToSend.append("discountPercentage", formData.discountPercentage === "" ? "0" : formData.discountPercentage.toString());
       if (formData.discountStartDate) formDataToSend.append("discountStartDate", formData.discountStartDate);
       if (formData.discountEndDate) formDataToSend.append("discountEndDate", formData.discountEndDate);
+      formDataToSend.append("sections", JSON.stringify(sections));
       
       const cleanAttributes = Object.keys(attributes).reduce((acc, key) => {
         const values = attributes[key];
@@ -300,6 +305,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
           brand: formData.brand,
           images: images,
           attributes: attributes,
+          sections: sections,
           published: formData.published,
         };
 
@@ -419,6 +425,12 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
                       value={formData.description}
                       onChange={(e) => handleInputChange("description", e.target.value)}
                       rows={3}
+                    />
+                  </div>
+                  <div className="pt-2 border-t">
+                    <SectionsManager
+                      sections={sections}
+                      onChange={setSections}
                     />
                   </div>
                 </div>

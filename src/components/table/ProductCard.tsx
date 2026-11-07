@@ -41,6 +41,7 @@ interface Product {
   attributes?: {
     [key: string]: string[];
   };
+  sections?: any[];
   buyPrice: string;
   sellPrice: string;
   wholesalePrice?: string;

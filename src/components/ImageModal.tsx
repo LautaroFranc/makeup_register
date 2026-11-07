@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, X, Plus, Loader2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Plus,
+  Loader2,
+  Trash2,
+} from "lucide-react";
 
 interface ImageModalProps {
   images: string[];
@@ -18,7 +25,9 @@ interface ImageModalProps {
   productName: string;
   productId: string;
   onAddImages?: (newImages: File[]) => void;
+  onDeleteImage?: (imageUrl: string) => void;
   isLoading?: boolean;
+  isDeleting?: boolean;
 }
 
 export const ImageModal: React.FC<ImageModalProps> = ({
@@ -28,10 +37,20 @@ export const ImageModal: React.FC<ImageModalProps> = ({
   productName,
   productId,
   onAddImages,
+  onDeleteImage,
   isLoading = false,
+  isDeleting = false,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Al borrar la última imagen el índice queda fuera de rango y next/image
+  // recibe `undefined`. Lo reacomodamos cuando cambia la lista.
+  useEffect(() => {
+    if (currentImageIndex > images.length - 1) {
+      setCurrentImageIndex(Math.max(0, images.length - 1));
+    }
+  }, [images.length, currentImageIndex]);
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -133,6 +152,20 @@ export const ImageModal: React.FC<ImageModalProps> = ({
                 {currentImageIndex + 1} / {images.length}
               </div>
             )}
+
+            {/* Eliminar la imagen que se está viendo */}
+            {onDeleteImage && images && images.length > 0 && !isLoading && (
+              <button
+                type="button"
+                onClick={() => onDeleteImage(images[currentImageIndex])}
+                disabled={isDeleting}
+                className="absolute top-4 left-4 bg-black/50 hover:bg-red-600 text-white px-2 py-1 rounded text-sm flex items-center gap-1 disabled:opacity-50 transition-colors"
+                title="Eliminar imagen"
+              >
+                <Trash2 className="h-4 w-4" />
+                Eliminar
+              </button>
+            )}
           </div>
 
           {/* Miniaturas */}
@@ -140,23 +173,38 @@ export const ImageModal: React.FC<ImageModalProps> = ({
             <div className="mt-4">
               <div className="flex gap-2 overflow-x-auto pb-2">
                 {images.map((image, index) => (
-                  <button
-                    key={index}
-                    onClick={() => goToImage(index)}
-                    className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
-                      index === currentImageIndex
-                        ? "border-blue-500 ring-2 ring-blue-200"
-                        : "border-gray-200 hover:border-gray-400"
-                    }`}
-                  >
-                    <Image
-                      src={image}
-                      alt={`Miniatura ${index + 1}`}
-                      width={64}
-                      height={64}
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
+                  <div key={index} className="relative flex-shrink-0">
+                    <button
+                      onClick={() => goToImage(index)}
+                      className={`block w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                        index === currentImageIndex
+                          ? "border-blue-500 ring-2 ring-blue-200"
+                          : "border-gray-200 hover:border-gray-400"
+                      }`}
+                    >
+                      <Image
+                        src={image}
+                        alt={`Miniatura ${index + 1}`}
+                        width={64}
+                        height={64}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                    {onDeleteImage && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteImage(image);
+                        }}
+                        disabled={isDeleting}
+                        className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-red-600 text-white flex items-center justify-center shadow hover:bg-red-700 disabled:opacity-50 transition-colors"
+                        title="Eliminar imagen"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
                 ))}
 
                 {/* Botón para agregar más imágenes */}
