@@ -799,4 +799,49 @@ export async function OPTIONS() {
   });
 }
 
-export { handler as GET, handler as POST, handler as DELETE };
+export async function GET(req: Request) {
+  const accept = req.headers.get("accept") || "";
+  // Si es un probe/healthcheck sin SSE
+  if (!accept.includes("text/event-stream")) {
+    return new Response(
+      JSON.stringify({
+        status: "ok",
+        server: "nova-inventory-mcp",
+        version: "1.0.0",
+        protocolVersion: "2024-11-05",
+        capabilities: { tools: { listChanged: true } },
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization, mcp-protocol-version, Accept",
+        },
+      }
+    );
+  }
+
+  const res = await handler(req);
+  const headers = new Headers(res.headers);
+  headers.set("Access-Control-Allow-Origin", "*");
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  });
+}
+
+export async function POST(req: Request) {
+  const res = await handler(req);
+  const headers = new Headers(res.headers);
+  headers.set("Access-Control-Allow-Origin", "*");
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  });
+}
+
+export { handler as DELETE };
