@@ -9,7 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.2",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.6",
@@ -38,7 +37,6 @@
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.471.2",
-    "mcp-handler": "^2.3.1",
     "mongoose": "^8.9.5",
     "next": "15.1.11",
     "nodemailer": "^6.10.1",
