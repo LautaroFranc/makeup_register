@@ -1,1 +1,1 @@
-export { GET, POST, DELETE, dynamic, maxDuration } from "./[transport]/route";
+export { GET, POST, DELETE, OPTIONS, dynamic, maxDuration } from "./[transport]/route";
