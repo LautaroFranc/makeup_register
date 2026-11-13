@@ -10,11 +10,13 @@ import {
   Check,
   Copy,
   Eye,
+  ExternalLink,
   Loader2,
   Lock,
   PlugZap,
   ShieldCheck,
   Trash2,
+  Zap,
 } from "lucide-react";
 
 interface Connection {
@@ -37,12 +39,37 @@ export default function McpPage() {
 
   const [origin, setOrigin] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copiedChatGPT, setCopiedChatGPT] = useState(false);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [revoking, setRevoking] = useState<string | null>(null);
 
   const endpoint = origin ? `${origin}/api/mcp` : "/api/mcp";
+
+  // Deep link de Claude — abre claude.ai con el modal pre-llenado
+  const claudeDeepLink = origin
+    ? `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=${encodeURIComponent("Makeup Register")}&connectorUrl=${encodeURIComponent(`${origin}/api/mcp`)}`
+    : "#";
+
+  // Para ChatGPT no existe deep link oficial → copiamos la URL al portapapeles
+  const copyChatGPTUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(endpoint);
+      setCopiedChatGPT(true);
+      toast({
+        title: "URL copiada para ChatGPT",
+        description: "Pegala en ChatGPT → Configuración → Conectores → Agregar conector MCP personalizado.",
+      });
+      setTimeout(() => setCopiedChatGPT(false), 3000);
+    } catch {
+      toast({
+        title: "No se pudo copiar",
+        description: endpoint,
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -197,6 +224,52 @@ export default function McpPage() {
             <p className="mt-1 text-xs text-gray-400">
               Autenticación OAuth 2.1. No uses una API key ni un token personal.
             </p>
+          </div>
+
+          {/* ── Botones de conexión rápida ── */}
+          <div className="pt-1">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Conexión rápida
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {/* Claude — deep link oficial que pre-llena el modal */}
+              <a
+                href={claudeDeepLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+                  origin
+                    ? "bg-[#D97706] hover:bg-[#B45309] text-white"
+                    : "bg-gray-100 text-gray-400 cursor-not-allowed pointer-events-none"
+                }`}
+              >
+                <Bot className="h-4 w-4" />
+                Conectar a Claude
+                <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+              </a>
+
+              {/* ChatGPT — copia URL + instrucciones (no existe deep link oficial) */}
+              <button
+                type="button"
+                onClick={copyChatGPTUrl}
+                disabled={!origin}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm font-medium text-green-800 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {copiedChatGPT ? (
+                  <Check className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Zap className="h-4 w-4 text-green-600" />
+                )}
+                {copiedChatGPT ? "URL copiada ✓" : "Conectar a ChatGPT"}
+              </button>
+            </div>
+
+            {/* Aviso para ChatGPT */}
+            <div className="mt-2 rounded-lg border border-green-100 bg-green-50/60 px-3 py-2 text-xs text-green-700">
+              <span className="font-medium">ChatGPT:</span> al hacer clic se copia la URL.
+              Pegala en ChatGPT → <span className="font-medium">Configuración → Conectores → Agregar conector MCP personalizado</span>.
+              Requiere plan Pro, Team o Enterprise.
+            </div>
           </div>
 
           <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
