@@ -11,6 +11,9 @@ import GlobalDiscount from "@/models/GlobalDiscount";
 import { getMcpProfile, getMcpUserId } from "./auth";
 import { escapeRegex } from "./oauth";
 import connectDB from "@/config/db";
+import cloudinary from "@/config/cloudinary";
+import { generateArgentineBarcode } from "@/lib/barcodeUtils";
+import slugify from "slugify";
 
 /**
  * Tools MCP de SOLO LECTURA.
@@ -1198,6 +1201,644 @@ export function registerTools(server: McpServer) {
           productName: (product as any).name || "",
           attributes: args.attributes,
           message: "Atributos actualizados correctamente.",
+        };
+      })
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Helper interno: genera código interno único tipo P100, P101, etc.
+  // ─────────────────────────────────────────────────────────────────────────
+  async function generateUniqueProductCode(prefix = "P"): Promise<string> {
+    const lastProduct = await Product.findOne().sort({ createdAt: -1 });
+    const lastCode = (lastProduct as any)?.code || `${prefix}99`;
+    const lastNumber = parseInt(lastCode.replace(prefix, "")) || 99;
+    return `${prefix}${lastNumber + 1}`;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // upload_product_image — sube una imagen a Cloudinary y devuelve la URL
+  // ─────────────────────────────────────────────────────────────────────────
+  server.registerTool(
+    "upload_product_image",
+    {
+      title: "Subir imagen de producto",
+      description:
+        "Sube una imagen a Cloudinary y devuelve la URL segura para usarla al crear o editar un producto. " +
+        "La imagen se pasa como string Base64 (sin el prefijo data:image/...). " +
+        "Límite: 5 MB. Formatos aceptados: jpg, png, webp, gif.",
+      inputSchema: z.object({
+        base64: z
+          .string()
+          .min(10)
+          .describe(
+            "Contenido de la imagen en Base64 puro (sin el prefijo 'data:image/...;base64,'). " +
+            "Tamaño máximo: 5 MB."
+          ),
+        mimeType: z
+          .enum(["image/jpeg", "image/png", "image/webp", "image/gif"])
+          .describe("Tipo MIME de la imagen."),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (args, _ctx) =>
+      run("upload_product_image", async () => {
+        const approxBytes = Math.ceil(args.base64.length * 0.75);
+        if (approxBytes > 5 * 1024 * 1024) {
+          throw new ToolInputError(
+            "La imagen excede el límite de 5 MB. Comprimila antes de subirla."
+          );
+        }
+
+        const dataUri = `data:${args.mimeType};base64,${args.base64}`;
+        const result = await cloudinary.uploader.upload(dataUri, {
+          folder: "products",
+          resource_type: "auto",
+        });
+
+        return {
+          url: result.secure_url,
+          publicId: result.public_id,
+          width: result.width,
+          height: result.height,
+          format: result.format,
+          bytes: result.bytes,
+        };
+      })
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // create_product — ESCRITURA: crea un nuevo producto
+  // ─────────────────────────────────────────────────────────────────────────
+  server.registerTool(
+    "create_product",
+    {
+      title: "Crear producto",
+      description:
+        "Crea un nuevo producto en el catálogo del usuario autenticado. " +
+        "El código interno y el código de barras EAN-13 se generan automáticamente. " +
+        "Para subir imágenes, primero usá upload_product_image para obtener la URL, " +
+        "luego pasá esa URL en el campo image o images.",
+      inputSchema: z.object({
+        name: z
+          .string()
+          .trim()
+          .min(1)
+          .max(200)
+          .describe("Nombre del producto. Requerido."),
+        description: z
+          .string()
+          .max(5000)
+          .optional()
+          .describe("Descripción del producto."),
+        brand: z
+          .string()
+          .trim()
+          .max(100)
+          .optional()
+          .describe("Marca del producto (ej: 'L Oreal', 'Maybelline')."),
+        category: z
+          .string()
+          .trim()
+          .max(100)
+          .optional()
+          .describe("Nombre exacto de la categoría. Debe existir en el catálogo."),
+        sellPrice: z
+          .number()
+          .nonnegative()
+          .describe("Precio de venta al público. Requerido."),
+        buyPrice: z
+          .number()
+          .nonnegative()
+          .optional()
+          .describe("Precio de costo (no se expone en el MCP público)."),
+        wholesalePrice: z
+          .number()
+          .nonnegative()
+          .optional()
+          .describe("Precio mayorista."),
+        stock: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe("Stock inicial. Por defecto 0."),
+        published: z
+          .boolean()
+          .optional()
+          .describe("Si se publica en la tienda pública. Por defecto false."),
+        image: z
+          .string()
+          .url()
+          .optional()
+          .describe(
+            "URL de la imagen principal. Obtenerla primero con upload_product_image."
+          ),
+        images: z
+          .array(z.string().url())
+          .max(10)
+          .optional()
+          .describe(
+            "URLs de imágenes adicionales. Obtenerlas primero con upload_product_image."
+          ),
+        attributes: z
+          .record(
+            z.string().min(1).max(60),
+            z.array(z.string().min(1).max(200)).max(50)
+          )
+          .optional()
+          .describe(
+            "Atributos dinámicos. Ej: { \"preocupacion\": [\"hidratacion\"], \"color\": [\"rojo\"] }"
+          ),
+        sections: z
+          .array(
+            z.object({
+              title: z.string().min(1).max(200),
+              content: z.string().max(5000),
+            })
+          )
+          .max(10)
+          .optional()
+          .describe("Secciones/acordeones del producto (modo de uso, ingredientes, etc.)."),
+        hasDiscount: z
+          .boolean()
+          .optional()
+          .describe("Si el producto tiene descuento activo."),
+        discountPercentage: z
+          .number()
+          .min(0)
+          .max(100)
+          .optional()
+          .describe("Porcentaje de descuento (0-100)."),
+        store: storeParam,
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
+    },
+    async (args, ctx) =>
+      run("create_product", async () => {
+        await connectDB();
+        const userId = getMcpUserId(ctx);
+
+        // Resolver tienda
+        let storeId: string;
+        if (args.store) {
+          const store = await resolveStore(userId, args.store);
+          storeId = String(store!._id);
+        } else {
+          const store = await Store.findOne({ user: userId, isActive: true });
+          if (!store) {
+            throw new ToolInputError(
+              "No encontré una tienda activa. Creá una tienda primero."
+            );
+          }
+          storeId = String(store._id);
+        }
+
+        // Generar código interno y barcode EAN-13
+        const code = await generateUniqueProductCode();
+        const barcode = generateArgentineBarcode("EAN13");
+
+        // Calcular precio descontado
+        const sellPrice = args.sellPrice;
+        const hasDiscount = args.hasDiscount ?? false;
+        const discountPercentage = args.discountPercentage ?? 0;
+        const discountedPrice =
+          hasDiscount && discountPercentage > 0
+            ? sellPrice * (1 - discountPercentage / 100)
+            : sellPrice;
+
+        const brand = (args.brand || "").trim();
+
+        const newProduct = await Product.create({
+          name: args.name,
+          description: args.description || "",
+          brand,
+          brandSlug: brand ? slugify(brand, { lower: true, strict: true }) : "",
+          category: args.category || "",
+          sellPrice: sellPrice.toFixed(2),
+          buyPrice: (args.buyPrice ?? 0).toFixed(2),
+          wholesalePrice: (args.wholesalePrice ?? 0).toFixed(2),
+          stock: args.stock ?? 0,
+          published: args.published ?? false,
+          image: args.image || null,
+          images: args.images || [],
+          attributes: args.attributes || {},
+          sections: args.sections || [],
+          hasDiscount,
+          discountPercentage,
+          discountedPrice: discountedPrice.toFixed(2),
+          code,
+          barcode,
+          user: userId,
+          store: storeId,
+          views: 0,
+        });
+
+        return {
+          success: true,
+          product: serializeProduct(newProduct),
+          code,
+          barcode,
+          message: "Producto creado exitosamente.",
+        };
+      })
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // update_product — ESCRITURA: edita un producto existente
+  // ─────────────────────────────────────────────────────────────────────────
+  server.registerTool(
+    "update_product",
+    {
+      title: "Editar producto",
+      description:
+        "Actualiza los datos de un producto propio. Solo se modifican los campos que se envíen; " +
+        "los omitidos quedan igual. Para reemplazar imágenes usá upload_product_image primero. " +
+        "No modifica el código interno ni el código de barras.",
+      inputSchema: z.object({
+        id: z
+          .string()
+          .trim()
+          .min(1)
+          .describe("ID de Mongo del producto a editar."),
+        name: z.string().trim().min(1).max(200).optional().describe("Nombre."),
+        description: z.string().max(5000).optional().describe("Descripcion."),
+        brand: z.string().trim().max(100).optional().describe("Marca."),
+        category: z
+          .string()
+          .trim()
+          .max(100)
+          .optional()
+          .describe("Categoria (nombre exacto)."),
+        sellPrice: z
+          .number()
+          .nonnegative()
+          .optional()
+          .describe("Precio de venta."),
+        buyPrice: z
+          .number()
+          .nonnegative()
+          .optional()
+          .describe("Precio de costo."),
+        wholesalePrice: z
+          .number()
+          .nonnegative()
+          .optional()
+          .describe("Precio mayorista."),
+        stock: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe("Stock."),
+        published: z
+          .boolean()
+          .optional()
+          .describe("Publicado en tienda publica."),
+        image: z
+          .string()
+          .url()
+          .optional()
+          .describe("Nueva URL de imagen principal."),
+        images: z
+          .array(z.string().url())
+          .max(10)
+          .optional()
+          .describe(
+            "Lista completa de imagenes adicionales (reemplaza las existentes)."
+          ),
+        attributes: z
+          .record(
+            z.string().min(1).max(60),
+            z.array(z.string().min(1).max(200)).max(50)
+          )
+          .optional()
+          .describe("Atributos dinamicos completos (reemplaza los existentes)."),
+        sections: z
+          .array(
+            z.object({
+              title: z.string().min(1).max(200),
+              content: z.string().max(5000),
+            })
+          )
+          .max(10)
+          .optional()
+          .describe("Secciones del producto."),
+        hasDiscount: z.boolean().optional().describe("Tiene descuento?"),
+        discountPercentage: z
+          .number()
+          .min(0)
+          .max(100)
+          .optional()
+          .describe("Porcentaje de descuento."),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
+    },
+    async (args, ctx) =>
+      run("update_product", async () => {
+        await connectDB();
+        const userId = getMcpUserId(ctx);
+
+        if (!mongoose.isValidObjectId(args.id)) {
+          throw new ToolInputError("El ID del producto no es valido.");
+        }
+
+        const existing = await Product.findOne({
+          _id: args.id,
+          user: userId,
+        });
+        if (!existing) {
+          throw new ToolInputError(
+            "No encontre ese producto en tu cuenta. Verifica el ID."
+          );
+        }
+
+        const updateFields: Record<string, unknown> = {};
+
+        if (args.name !== undefined) updateFields.name = args.name;
+        if (args.description !== undefined)
+          updateFields.description = args.description;
+        if (args.category !== undefined) updateFields.category = args.category;
+        if (args.stock !== undefined) updateFields.stock = args.stock;
+        if (args.published !== undefined) updateFields.published = args.published;
+        if (args.image !== undefined) updateFields.image = args.image;
+        if (args.images !== undefined) updateFields.images = args.images;
+        if (args.attributes !== undefined)
+          updateFields.attributes = args.attributes;
+        if (args.sections !== undefined) updateFields.sections = args.sections;
+
+        if (args.brand !== undefined) {
+          const brand = args.brand.trim();
+          updateFields.brand = brand;
+          updateFields.brandSlug = brand
+            ? slugify(brand, { lower: true, strict: true })
+            : "";
+        }
+
+        // Precios (guardados como string con 2 decimales)
+        const sellPrice =
+          args.sellPrice !== undefined
+            ? args.sellPrice
+            : toNumber((existing as any).sellPrice);
+        const hasDiscount =
+          args.hasDiscount !== undefined
+            ? args.hasDiscount
+            : Boolean((existing as any).hasDiscount);
+        const discountPercentage =
+          args.discountPercentage !== undefined
+            ? args.discountPercentage
+            : toNumber((existing as any).discountPercentage);
+
+        if (args.sellPrice !== undefined)
+          updateFields.sellPrice = sellPrice.toFixed(2);
+        if (args.buyPrice !== undefined)
+          updateFields.buyPrice = args.buyPrice.toFixed(2);
+        if (args.wholesalePrice !== undefined)
+          updateFields.wholesalePrice = args.wholesalePrice.toFixed(2);
+        if (
+          args.hasDiscount !== undefined ||
+          args.discountPercentage !== undefined ||
+          args.sellPrice !== undefined
+        ) {
+          const discounted =
+            hasDiscount && discountPercentage > 0
+              ? sellPrice * (1 - discountPercentage / 100)
+              : sellPrice;
+          updateFields.hasDiscount = hasDiscount;
+          updateFields.discountPercentage = discountPercentage;
+          updateFields.discountedPrice = discounted.toFixed(2);
+        }
+
+        if (Object.keys(updateFields).length === 0) {
+          throw new ToolInputError(
+            "No enviaste ningun campo para actualizar."
+          );
+        }
+
+        const updated = await Product.findOneAndUpdate(
+          { _id: args.id, user: userId },
+          updateFields,
+          { new: true, runValidators: true }
+        );
+
+        return {
+          success: true,
+          product: serializeProduct(updated),
+          message: "Producto actualizado correctamente.",
+        };
+      })
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // create_category — ESCRITURA: crea una nueva categoría
+  // ─────────────────────────────────────────────────────────────────────────
+  server.registerTool(
+    "create_category",
+    {
+      title: "Crear categoria",
+      description:
+        "Crea una nueva categoria en el catalogo del usuario autenticado. " +
+        "Si ya existe una con el mismo nombre en la tienda, devuelve error.",
+      inputSchema: z.object({
+        name: z
+          .string()
+          .trim()
+          .min(1)
+          .max(100)
+          .describe("Nombre de la categoria. Requerido y unico por tienda."),
+        description: z
+          .string()
+          .max(500)
+          .optional()
+          .describe("Descripcion opcional."),
+        color: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/)
+          .optional()
+          .describe("Color en hex (ej: '#3B82F6'). Por defecto azul."),
+        icon: z
+          .string()
+          .max(10)
+          .optional()
+          .describe("Emoji o icono (ej: 'U+1F484'). Por defecto caja."),
+        store: storeParam,
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
+    },
+    async (args, ctx) =>
+      run("create_category", async () => {
+        await connectDB();
+        const userId = getMcpUserId(ctx);
+
+        let storeId: string;
+        if (args.store) {
+          const store = await resolveStore(userId, args.store);
+          storeId = String(store!._id);
+        } else {
+          const store = await Store.findOne({ user: userId, isActive: true });
+          if (!store) {
+            throw new ToolInputError(
+              "No encontre una tienda activa. Crea una tienda primero."
+            );
+          }
+          storeId = String(store._id);
+        }
+
+        const existing = await Category.findOne({
+          user: userId,
+          store: storeId,
+          name: { $regex: new RegExp(`^${args.name.trim()}$`, "i") },
+        });
+        if (existing) {
+          throw new ToolInputError(
+            `Ya existe una categoria llamada "${args.name}" en esa tienda.`
+          );
+        }
+
+        const category = await Category.create({
+          name: args.name.trim(),
+          description: (args.description || "").trim(),
+          color: args.color || "#3B82F6",
+          icon: args.icon || "U+1F4E6",
+          user: userId,
+          store: storeId,
+          isActive: true,
+        });
+
+        return {
+          success: true,
+          category: {
+            id: String(category._id),
+            name: (category as any).name,
+            description: (category as any).description,
+            color: (category as any).color,
+            icon: (category as any).icon,
+            store: storeId,
+          },
+          message: "Categoria creada exitosamente.",
+        };
+      })
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // update_category — ESCRITURA: edita una categoría existente
+  // ─────────────────────────────────────────────────────────────────────────
+  server.registerTool(
+    "update_category",
+    {
+      title: "Editar categoria",
+      description:
+        "Actualiza una categoria propia. Solo se modifican los campos enviados. " +
+        "Si se cambia el nombre, se valida que no exista otra con el mismo nombre en la tienda.",
+      inputSchema: z.object({
+        id: z
+          .string()
+          .trim()
+          .min(1)
+          .describe("ID de Mongo de la categoria a editar."),
+        name: z.string().trim().min(1).max(100).optional().describe("Nuevo nombre."),
+        description: z.string().max(500).optional().describe("Nueva descripcion."),
+        color: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/)
+          .optional()
+          .describe("Color en hex."),
+        icon: z.string().max(10).optional().describe("Emoji o icono."),
+        isActive: z
+          .boolean()
+          .optional()
+          .describe("Si la categoria esta activa (visible en filtros)."),
+        orden: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe("Orden de aparicion en menus."),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
+    },
+    async (args, ctx) =>
+      run("update_category", async () => {
+        await connectDB();
+        const userId = getMcpUserId(ctx);
+
+        if (!mongoose.isValidObjectId(args.id)) {
+          throw new ToolInputError("El ID de categoria no es valido.");
+        }
+
+        const category = await Category.findOne({
+          _id: args.id,
+          user: userId,
+        });
+        if (!category) {
+          throw new ToolInputError(
+            "No encontre esa categoria en tu cuenta. Verifica el ID."
+          );
+        }
+
+        if (args.name && args.name.trim() !== (category as any).name) {
+          const dupe = await Category.findOne({
+            user: userId,
+            store: (category as any).store,
+            name: { $regex: new RegExp(`^${args.name.trim()}$`, "i") },
+            _id: { $ne: args.id },
+          });
+          if (dupe) {
+            throw new ToolInputError(
+              `Ya existe una categoria llamada "${args.name}" en esa tienda.`
+            );
+          }
+        }
+
+        const updateData: Record<string, unknown> = {};
+        if (args.name !== undefined) updateData.name = args.name.trim();
+        if (args.description !== undefined)
+          updateData.description = args.description.trim();
+        if (args.color !== undefined) updateData.color = args.color;
+        if (args.icon !== undefined) updateData.icon = args.icon;
+        if (args.isActive !== undefined) updateData.isActive = args.isActive;
+        if (args.orden !== undefined) updateData.orden = args.orden;
+
+        if (Object.keys(updateData).length === 0) {
+          throw new ToolInputError("No enviaste ningun campo para actualizar.");
+        }
+
+        const updated = await Category.findByIdAndUpdate(args.id, updateData, {
+          new: true,
+          runValidators: true,
+        });
+
+        return {
+          success: true,
+          category: {
+            id: String(updated!._id),
+            name: (updated as any).name,
+            description: (updated as any).description,
+            color: (updated as any).color,
+            icon: (updated as any).icon,
+            isActive: (updated as any).isActive,
+            orden: (updated as any).orden,
+          },
+          message: "Categoria actualizada correctamente.",
         };
       })
   );
