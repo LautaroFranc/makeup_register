@@ -14,6 +14,27 @@ import { generateArgentineBarcode } from "@/lib/barcodeUtils";
 // Conectar a la base de datos antes de manejar cualquier solicitud
 connectDB();
 
+function escapeRegex(text: string) {
+  return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+}
+
+function createAccentInsensitiveRegex(value: string) {
+  const normalized = value.trim();
+  let pattern = "";
+  for (const char of normalized) {
+    const lower = char.toLowerCase();
+    if (lower === "a" || lower === "á") pattern += "[aáAÁ]";
+    else if (lower === "e" || lower === "é") pattern += "[eéEÉ]";
+    else if (lower === "i" || lower === "í") pattern += "[iíIÍ]";
+    else if (lower === "o" || lower === "ó") pattern += "[oóOÓ]";
+    else if (lower === "u" || lower === "ú" || lower === "ü") pattern += "[uúüUÚÜ]";
+    else if (lower === "n" || lower === "ñ") pattern += "[nñNÑ]";
+    else if (lower === "-" || lower === "_" || lower === " ") pattern += "[-_ ]+";
+    else pattern += escapeRegex(char);
+  }
+  return new RegExp(`^${pattern}$`, "i");
+}
+
 async function generateUniqueProductCode(prefix = "P") {
   const lastProduct = await Product.findOne().sort({ createdAt: -1 });
   const lastCode = lastProduct?.code || `${prefix}99`;
@@ -37,6 +58,9 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search");
     const minPrice = searchParams.get("minPrice");
     const maxPrice = searchParams.get("maxPrice");
+    const preocupacion = searchParams.get("preocupacion") || searchParams.get("concern");
+    const attribute = searchParams.get("attribute");
+    const attributeValue = searchParams.get("attributeValue") || searchParams.get("value");
 
     if (!slug) {
       return NextResponse.json(
@@ -87,6 +111,32 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Filtro de preocupación / necesidad (cabello dañado, con frizz, etc.)
+    if (preocupacion && preocupacion !== "all") {
+      query["attributes.preocupacion"] = {
+        $regex: createAccentInsensitiveRegex(preocupacion),
+      };
+    }
+
+    // Filtro genérico por clave y valor de atributo (ej: attribute=aroma&value=lavanda)
+    if (attribute && attributeValue && attributeValue !== "all") {
+      query[`attributes.${attribute.trim()}`] = {
+        $regex: createAccentInsensitiveRegex(attributeValue),
+      };
+    }
+
+    // Filtro dinámico por parámetros prefijados con attr_ (ej: ?attr_preocupacion=cabello-rizado)
+    searchParams.forEach((val, key) => {
+      if (key.startsWith("attr_") && val && val !== "all") {
+        const attrName = key.replace("attr_", "").trim();
+        if (attrName) {
+          query[`attributes.${attrName}`] = {
+            $regex: createAccentInsensitiveRegex(val),
+          };
+        }
+      }
+    });
+
     // Filtro de stock
     if (stockFilter) {
       switch (stockFilter) {
@@ -109,6 +159,7 @@ export async function GET(req: NextRequest) {
         { description: { $regex: search, $options: "i" } },
         { category: { $regex: search, $options: "i" } },
         { brand: { $regex: search, $options: "i" } },
+        { "attributes.preocupacion": { $regex: search, $options: "i" } },
       ];
     }
 
@@ -274,6 +325,52 @@ export async function GET(req: NextRequest) {
       })
     ).filter((b) => b && String(b).trim() !== "");
 
+    // Atributos dinámicos disponibles (preocupación, aromas, etc.) de productos publicados
+    const productsWithAttributes = await Product.find({
+      user: user._id,
+      published: true,
+      attributes: { $exists: true, $ne: null },
+    })
+      .select("attributes")
+      .lean();
+
+    const availableAttributes: Record<string, string[]> = {};
+    for (const p of productsWithAttributes) {
+      if (p.attributes && typeof p.attributes === "object") {
+        for (const [key, rawValues] of Object.entries(
+          p.attributes as Record<string, any>
+        )) {
+          if (!Array.isArray(rawValues)) continue;
+          if (!availableAttributes[key]) {
+            availableAttributes[key] = [];
+          }
+          for (const item of rawValues) {
+            let val = "";
+            if (typeof item === "string") {
+              try {
+                const parsed = JSON.parse(item);
+                if (parsed && typeof parsed.name === "string") {
+                  val = parsed.name.trim();
+                } else {
+                  val = item.trim();
+                }
+              } catch {
+                val = item.trim();
+              }
+            }
+            if (val && !availableAttributes[key].includes(val)) {
+              availableAttributes[key].push(val);
+            }
+          }
+        }
+      }
+    }
+
+    // Ordenar los valores de cada atributo
+    for (const key of Object.keys(availableAttributes)) {
+      availableAttributes[key].sort((a, b) => a.localeCompare(b, "es"));
+    }
+
     return NextResponse.json({
       success: true,
       products: productsWithDiscount,
@@ -288,9 +385,13 @@ export async function GET(req: NextRequest) {
       filters: {
         availableCategories,
         availableBrands,
+        availableAttributes,
         appliedFilters: {
           category,
           brand,
+          preocupacion,
+          attribute,
+          attributeValue,
           published,
           stock: stockFilter,
           search,

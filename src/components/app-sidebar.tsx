@@ -23,6 +23,7 @@ import {
   Eye,
   Megaphone,
   Telescope,
+  Bot,
 } from "lucide-react";
 
 import {
@@ -168,6 +169,11 @@ const menuGroups = [
         title: "Configuración",
         url: "/settings",
         icon: Settings,
+      },
+      {
+        title: "Conectar IA",
+        url: "/mcp",
+        icon: Bot,
       },
     ],
   },

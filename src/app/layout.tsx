@@ -28,14 +28,21 @@ export default function RootLayout({
   const pathname = usePathname();
   const router = useRouter();
 
+  // Rutas públicas: login y el consentimiento OAuth (lo abre un cliente
+  // externo y no debe quedar atrapado detrás de la sesión del panel).
+  const isPublicRoute =
+    pathname === "/login" ||
+    pathname === "/oauth" ||
+    pathname.startsWith("/oauth/");
+
   useEffect(() => {
-    if (![pathname].includes("/login")) {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        router.push("/login");
-      }
+    if (isPublicRoute) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
     }
-  }, [pathname]);
+  }, [pathname, isPublicRoute, router]);
   return (
     <html lang="en">
       <body
@@ -43,10 +50,10 @@ export default function RootLayout({
       >
         <UserProviderWrapper>
           <SidebarProvider>
-            {![pathname].includes("/login") ? <AppSidebar /> : null}
+            {!isPublicRoute ? <AppSidebar /> : null}
 
             <main className="w-full">
-              <SidebarTrigger />
+              {!isPublicRoute ? <SidebarTrigger /> : null}
               {children}
               <Toaster />
             </main>

@@ -4,6 +4,7 @@ import React from "react";
 import { Label } from "@/components/ui/label";
 import { ColorAttributeManager } from "./ColorAttributeManager";
 import { ScentAttributeManager } from "./ScentAttributeManager";
+import { ConcernAttributeManager } from "./ConcernAttributeManager";
 
 interface DynamicAttributesProps {
   attributes: { [key: string]: string[] };
@@ -19,6 +20,15 @@ export const DynamicAttributes: React.FC<DynamicAttributesProps> = ({
   attributes,
   onAttributesChange,
 }) => {
+  // ── Preocupación / Tipo de cabello ──────────────────────────────────────
+  const getConcernsFromAttributes = (): string[] => {
+    return attributes["preocupacion"] || [];
+  };
+
+  const saveConcernsToAttributes = (concerns: string[]) => {
+    onAttributesChange({ ...attributes, preocupacion: concerns });
+  };
+
   // ── Colores ──────────────────────────────────────────────────────────────
   const getColorsFromAttributes = (): ColorInfo[] => {
     const colorStrings = attributes["color"] || [];
@@ -47,7 +57,18 @@ export const DynamicAttributes: React.FC<DynamicAttributesProps> = ({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Preocupaciones */}
+      <div className="space-y-2">
+        <ConcernAttributeManager
+          concerns={getConcernsFromAttributes()}
+          onConcernsChange={saveConcernsToAttributes}
+        />
+      </div>
+
+      {/* Divisor */}
+      <hr className="border-gray-200" />
+
       {/* Colores */}
       <div className="space-y-2">
         <ColorAttributeManager
