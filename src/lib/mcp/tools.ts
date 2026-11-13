@@ -10,6 +10,7 @@ import ContentPiece from "@/models/ContentPiece";
 import GlobalDiscount from "@/models/GlobalDiscount";
 import { getMcpProfile, getMcpUserId } from "./auth";
 import { escapeRegex } from "./oauth";
+import connectDB from "@/config/db";
 
 /**
  * Tools MCP de SOLO LECTURA.
@@ -296,7 +297,7 @@ export function registerTools(server: McpServer) {
           .min(1)
           .max(100)
           .optional()
-          .describe("Texto a buscar en nombre, marca, descripción o categoría."),
+          .describe("Texto a buscar en nombre, marca, descripción, categoría o preocupaciones."),
         category: z
           .string()
           .trim()
@@ -311,6 +312,27 @@ export function registerTools(server: McpServer) {
           .max(100)
           .optional()
           .describe("Marca exacta (sin distinguir mayúsculas)."),
+        preocupacion: z
+          .string()
+          .trim()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Filtrar por preocupación capilar o cosmética (ej: 'hidratación', 'anti-edad'). Acepta tildes o sin tildes."),
+        attributeKey: z
+          .string()
+          .trim()
+          .min(1)
+          .max(60)
+          .optional()
+          .describe("Nombre del atributo dinámico a filtrar (ej: 'color', 'aroma', 'tipo_cabello'). Usar junto con attributeValue."),
+        attributeValue: z
+          .string()
+          .trim()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Valor del atributo dinámico (ej: 'rojo', 'menta'). Usar junto con attributeKey."),
         published: z
           .enum(["all", "true", "false"])
           .optional()
@@ -350,6 +372,7 @@ export function registerTools(server: McpServer) {
             { description: regex },
             { category: regex },
             { brand: regex },
+            { "attributes.preocupacion": regex },
           ];
         }
 
@@ -357,6 +380,30 @@ export function registerTools(server: McpServer) {
         if (args.brand) {
           query.brand = new RegExp(`^${escapeRegex(args.brand)}$`, "i");
         }
+
+        // Filtro por preocupación (con tolerancia a tildes)
+        if (args.preocupacion) {
+          const normalized = args.preocupacion
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase();
+          query["attributes.preocupacion"] = {
+            $elemMatch: {
+              $regex: new RegExp(escapeRegex(normalized), "i"),
+            },
+          };
+        }
+
+        // Filtro por atributo dinámico genérico
+        if (args.attributeKey && args.attributeValue) {
+          const safeKey = args.attributeKey.replace(/[^a-zA-Z0-9_\-]/g, "");
+          query[`attributes.${safeKey}`] = {
+            $elemMatch: {
+              $regex: new RegExp(escapeRegex(args.attributeValue), "i"),
+            },
+          };
+        }
+
         if (args.published === "true") query.published = true;
         if (args.published === "false") query.published = false;
 
@@ -919,6 +966,238 @@ export function registerTools(server: McpServer) {
             createdAt: iso(piece.createdAt),
             updatedAt: iso(piece.updatedAt),
           })),
+        };
+      })
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // list_attributes — atributos dinámicos del catálogo (menú dinámico)
+  // ─────────────────────────────────────────────────────────────────────────
+  server.registerTool(
+    "list_attributes",
+    {
+      title: "Listar atributos del catálogo",
+      description:
+        "Devuelve todos los atributos dinámicos (preocupaciones, colores, aromas, tipos de cabello, etc.) " +
+        "que tienen los productos publicados de la tienda. Sirve para armar menús de navegación dinámicos " +
+        "y para saber qué valores puede tener cada atributo antes de filtrar con list_products.",
+      inputSchema: z.object({
+        store: storeParam,
+        onlyPublished: z
+          .boolean()
+          .optional()
+          .describe("Incluir solo productos publicados. Por defecto true."),
+      }),
+      annotations: READ_ONLY,
+    },
+    async (args, ctx) =>
+      run("list_attributes", async () => {
+        await connectDB();
+        const userId = getMcpUserId(ctx);
+        const store = await resolveStore(userId, args.store);
+
+        const query: Record<string, any> = { user: userId };
+        if (store) query.store = String(store._id);
+        if (args.onlyPublished !== false) query.published = true;
+
+        const products = await Product.find(query)
+          .select("attributes brand")
+          .lean();
+
+        const attributeMap: Record<string, Set<string>> = {};
+        const brands = new Set<string>();
+
+        for (const product of products as any[]) {
+          if (product.brand) brands.add(product.brand.trim());
+          const attrs = product.attributes || {};
+          for (const [key, value] of Object.entries(attrs)) {
+            if (!attributeMap[key]) attributeMap[key] = new Set();
+            const values = Array.isArray(value) ? value : [value];
+            for (const v of values) {
+              if (!v) continue;
+              if (typeof v === "string") {
+                try {
+                  const parsed = JSON.parse(v);
+                  if (parsed && typeof parsed === "object") {
+                    const label = parsed.name || parsed.hex || v;
+                    if (label) attributeMap[key].add(label);
+                    continue;
+                  }
+                } catch { /* string plano */ }
+                attributeMap[key].add(v.trim());
+              }
+            }
+          }
+        }
+
+        const result: Record<string, string[]> = {};
+        for (const [key, values] of Object.entries(attributeMap)) {
+          result[key] = [...values].sort((a, b) => a.localeCompare(b, "es"));
+        }
+
+        return {
+          totalProducts: (products as any[]).length,
+          brands: [...brands].sort((a, b) => a.localeCompare(b, "es")),
+          attributes: result,
+          attributeKeys: Object.keys(result).sort(),
+        };
+      })
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // get_menu_data — datos completos para menú dinámico público
+  // ─────────────────────────────────────────────────────────────────────────
+  server.registerTool(
+    "get_menu_data",
+    {
+      title: "Datos del menú dinámico",
+      description:
+        "Devuelve en una sola consulta todo lo necesario para armar el menú de navegación dinámico: " +
+        "categorías activas, marcas y todos los atributos (preocupaciones, colores, aromas, etc.). " +
+        "Equivale a llamar list_categories + list_attributes en un solo paso.",
+      inputSchema: z.object({
+        store: storeParam,
+      }),
+      annotations: READ_ONLY,
+    },
+    async (args, ctx) =>
+      run("get_menu_data", async () => {
+        await connectDB();
+        const userId = getMcpUserId(ctx);
+        const store = await resolveStore(userId, args.store);
+
+        const productQuery: Record<string, any> = { user: userId, published: true };
+        const categoryQuery: Record<string, any> = { user: userId, isActive: true };
+        if (store) {
+          productQuery.store = String(store._id);
+          categoryQuery.store = String(store._id);
+        }
+
+        const [products, categories] = await Promise.all([
+          Product.find(productQuery).select("attributes brand").lean(),
+          Category.find(categoryQuery)
+            .select("name slug description color icon productCount orden")
+            .sort({ orden: 1, name: 1 })
+            .lean(),
+        ]);
+
+        const attributeMap: Record<string, Set<string>> = {};
+        const brands = new Set<string>();
+
+        for (const product of products as any[]) {
+          if ((product as any).brand) brands.add((product as any).brand.trim());
+          const attrs = (product as any).attributes || {};
+          for (const [key, value] of Object.entries(attrs)) {
+            if (!attributeMap[key]) attributeMap[key] = new Set();
+            const values = Array.isArray(value) ? value : [value];
+            for (const v of values) {
+              if (!v) continue;
+              if (typeof v === "string") {
+                try {
+                  const parsed = JSON.parse(v);
+                  if (parsed && typeof parsed === "object") {
+                    const label = parsed.name || parsed.hex || v;
+                    if (label) attributeMap[key].add(label);
+                    continue;
+                  }
+                } catch { /* string plano */ }
+                attributeMap[key].add(v.trim());
+              }
+            }
+          }
+        }
+
+        const attributes: Record<string, string[]> = {};
+        for (const [key, values] of Object.entries(attributeMap)) {
+          attributes[key] = [...values].sort((a, b) => a.localeCompare(b, "es"));
+        }
+
+        return {
+          categories: (categories as any[]).map((cat: any) => ({
+            id: String(cat._id),
+            name: cat.name || "",
+            slug: cat.slug || "",
+            description: cat.description || "",
+            color: cat.color || "",
+            icon: cat.icon || "",
+            productCount: toNumber(cat.productCount),
+            order: toNumber(cat.orden),
+          })),
+          brands: [...brands].sort((a, b) => a.localeCompare(b, "es")),
+          attributes,
+          attributeKeys: Object.keys(attributes).sort(),
+          totalPublishedProducts: (products as any[]).length,
+        };
+      })
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // set_product_attributes — ESCRITURA: edita los atributos de un producto
+  // ─────────────────────────────────────────────────────────────────────────
+  server.registerTool(
+    "set_product_attributes",
+    {
+      title: "Editar atributos de un producto",
+      description:
+        "Actualiza los atributos dinámicos (preocupaciones, colores, aromas, etc.) de un producto " +
+        "propio. Solo puede modificar atributos; no cambia precio, stock, nombre ni imágenes. " +
+        "Pasá los atributos completos que querés guardar: los que no mandes se eliminarán. " +
+        "Solo funciona con productos de la cuenta autenticada.",
+      inputSchema: z.object({
+        id: z
+          .string()
+          .trim()
+          .min(1)
+          .describe("ID de Mongo del producto a editar."),
+        attributes: z
+          .record(
+            z.string().min(1).max(60),
+            z.array(z.string().min(1).max(200)).max(50)
+          )
+          .describe(
+            "Mapa de atributos completo. Claves: nombre del atributo (ej: 'preocupacion', 'color', 'aroma'). " +
+            "Valores: array de strings. Ejemplo: { \"preocupacion\": [\"hidratación\", \"brillo\"], \"color\": [\"rojo\"] }"
+          ),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
+    },
+    async (args, ctx) =>
+      run("set_product_attributes", async () => {
+        await connectDB();
+        const userId = getMcpUserId(ctx);
+
+        if (!mongoose.isValidObjectId(args.id)) {
+          throw new ToolInputError("El ID del producto no es válido.");
+        }
+
+        // Buscar y verificar que el producto es del usuario autenticado
+        const product = await Product.findOne({
+          _id: args.id,
+          user: userId,
+        }).select("_id name attributes");
+
+        if (!product) {
+          throw new ToolInputError(
+            "No encontré ese producto en tu cuenta. Verificá el ID."
+          );
+        }
+
+        // Guardar atributos
+        await Product.updateOne(
+          { _id: args.id, user: userId },
+          { $set: { attributes: args.attributes } }
+        );
+
+        return {
+          success: true,
+          productId: String(product._id),
+          productName: (product as any).name || "",
+          attributes: args.attributes,
+          message: "Atributos actualizados correctamente.",
         };
       })
   );
